@@ -1,72 +1,38 @@
-import * as cheerio from 'cheerio';
-import express from 'express'; 
-import fetch from 'node-fetch'; 
+import http from 'node:http'; 
+import { URL } from 'node:url';
+import { WebSocketServer } from 'ws';
+import GameRegistry from './game.js';
 
-const app = express(); 
 const port = 8000; 
+const server = http.createServer(); 
+const wss = new WebSocketServer({ server }); 
+const game_reg = new GameRegistry(); 
 
-app.get('/api/species', async (req, res) => {
-  const dbUrl = 'https://pokemondb.net/pokedex/shiny'; 
-  try {
-    const badGen = req.query.hasOwnProperty('gen') 
-      && (isNaN(req.query.gen) || parseInt(req.query.gen) < 0); 
-    if(badGen) {
-      throw new Error('Gen must be a positive integer'); 
+wss.on('connection', (ws, req) => {
+  const url = new URL(req.url, `ws://${req.headers.host}/`); 
+  const name = url.searchParams.get('name'); 
+  if(!name) {
+    ws.close(1000, 'No name provided'); 
+  }
+  if(url.pathname === '/api/host') {
+    game_reg.start_game(name, ws); 
+  } else if(url.pathname === '/api/join') {
+    const id = url.searchParams.get('id'); 
+    if(!id) {
+      ws.close(1000, 'No id provided'); 
     }
-
-    const html = await fetch(dbUrl).then(req => req.text()); 
-    const $ = cheerio.load(html); 
-    const genSelector = req.query.hasOwnProperty('gen') 
-      ? `#gen-${req.query.gen} + div` : '*'; 
-    const infocards = $(genSelector).find('.infocard'); 
-    const index = Math.floor(Math.random() * infocards.length); 
-    const species = infocards.eq(index).find('a').prop('innerText')
-      .toLocaleLowerCase().replaceAll(' ', '-');    
-
-    res.status(200)
-      .type('json')
-      .end(JSON.stringify({
-        status: 'OK',
-        species
-      })); 
-  } catch(err) {
-    console.log(err); 
-    res.status(400)
-      .type('json')
-      .end(JSON.stringify({
-        status: 'FAILED', 
-        error: err.message
-      }));
-  }  
-}); 
-
-app.get('/api/sprite', async (req, res) => {
-  const baseUrl = 'https://img.pokemondb.net/sprites/home/shiny';
-  try {
-    if(!req.query.hasOwnProperty('species')) {
-      throw new Error('No Pokemon species specified'); 
+    const game = game_reg.get_game(id); 
+    if(!game) {
+      ws.close(1000, `Invalid game id ${id}`); 
     }
-
-    const { species } = req.query; 
-    const imgUrl = `${baseUrl}/${species.toLowerCase()}.png`; 
-    const { ok, body } = await fetch(imgUrl); 
-
-    if(ok) {
-      res.status(200).type('png'); 
-      body.pipe(res);
-    } else {
-      throw new Error('The Pokemon species does not exist'); 
+    if(!game.add_player(name, ws)) {
+      ws.close(1000, `Cannot join game ${id}`); 
     }
-  } catch(err) {
-    console.log(`URL: ${req.url}`); 
-    console.log(err); 
-    res.status(400)
-      .type('json')
-      .end(JSON.stringify({
-        error: err.message  
-      })); 
+  } else {
+    ws.close(1000, 'Invalid endpoint'); 
   }
 }); 
- 
-app.listen(port, () => 
-  console.log(`Server started on port ${port}`)); 
+
+server.listen(port, () => {
+  console.log(`Server started on port ${port}`); 
+}); 
