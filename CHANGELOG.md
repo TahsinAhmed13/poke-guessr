@@ -12,4 +12,10 @@
 
 * server
     * create game registry to manage games
-    * setup websockets for duplex connection
+    * setup websockets server
+
+# 2023-07-11
+
+* server
+    * implement hosting and joining games
+    * implement starting and cancelling games
