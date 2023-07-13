@@ -19,3 +19,8 @@
 * server
     * implement hosting and joining games
     * implement starting and cancelling games
+
+# 2023-07-12
+
+* server
+    * designed JSON-based communications protocol

@@ -17,7 +17,9 @@ wss.on('connection', (ws, req) => {
   }
   switch(url.pathname) {
     case '/api/host': 
-      game_reg.start_game(name, ws); 
+      if(!game_reg.new_game(name, ws)) {
+        ws.close(1007, 'Failed to create new game');   
+      }
       break; 
     case '/api/join': 
       const id = url.searchParams.get('id'); 
@@ -30,7 +32,9 @@ wss.on('connection', (ws, req) => {
         ws.close(1007, `Invalid game id ${id}`); 
         return; 
       }
-      game.add_player(name, ws); 
+      if(!game.add_player(name, ws)) {
+        ws.close(1007, `Failed to join game ${id}`);   
+      }
       break;
     default: 
       ws.close(1007, 'Invalid endpoint'); 

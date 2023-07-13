@@ -1,7 +1,17 @@
+import { Actions } from "./protocol.js";
+
 class Player {
   constructor(socket) {
     this.socket = socket; 
     this.closed = false; 
+    this.socket.on('close', () => this.closed = true); 
+  }
+
+  close(code, reason) {
+    if(!this.closed) {
+      this.socket.close(code, reason); 
+      this.closed = true; 
+    }
   }
 }
 
@@ -9,38 +19,40 @@ class Game {
   constructor(game_reg, id, hostname, hostws) {
     this.game_reg = game_reg; 
     this.id = id; 
-    this.players = new Map(); 
     this.started = false; 
-    const host = this.add_player(hostname, hostws); 
+    this.players = new Map(); 
+    this.players.set(hostname, new Player(hostws));  
     hostws.on('message', (msg) => {
-      if(!this.started) {
-        try {
-          const { action } = JSON.parse(msg); 
-          if(!action) {
-            throw new Error('No action specified'); 
-          }
-          switch(action) {
-            case 'start': 
-              this.start(); 
-              break;
-            case 'cancel': 
-              this.cancel(); 
-              break; 
-            default: 
-              throw new Error('Invalid action');  
-          }
-        } catch({ name, message }) {
-          if(name === 'SyntaxError') {
-            message = 'Failed to parse JSON'; 
-          }
-          hostws.send(JSON.stringify({
-            event: 'error',
-            message
-          })); 
+      try {
+        const { action } = JSON.parse(msg); 
+        if(!action) {
+          throw new Error('No action specified'); 
         }
+        switch(action) {
+          case Actions.LEAVE:
+            this.remove_player(hostname); 
+            if(!this.started) {
+              this.cancel(); 
+            }
+            break; 
+          case Actions.START:
+            this.start(); 
+            break;
+          case Actions.CANCEL:
+            this.cancel(); 
+            break; 
+          default: 
+            throw new Error(`${action} action is not recognized`); 
+        }
+      } catch({ message }) {
+        hostws.send(JSON.stringify({
+          action: Actions.ERROR,
+          message
+        })); 
       }
-    }); 
-    hostws.on('close', (_, reason) => {
+    });
+    hostws.on('close', () => {
+      this.remove_player(hostname); 
       if(!this.started) {
         this.cancel(); 
       }
@@ -49,40 +61,63 @@ class Game {
 
   add_player(name, ws) {
     if(this.players.has(name)) {
-      ws.close(1007, `Player ${name} already exists`); 
-      return null; 
+      ws.send(JSON.stringify({
+        action: Actions.ERROR,
+        message: `Player ${name} already exists`
+      })); 
+      return false; 
     }
     if(this.started) {
-      ws.close(1007, `Game ${this.id} has already started`); 
-      return null; 
+      ws.send(JSON.stringify({
+        action: Actions.ERROR,
+        message: `Game ${this.id} has already started` 
+      }));
+      return false; 
     }
-    const player = new Player(ws); 
-    this.players.set(name, player); 
+    this.players.set(name, new Player(ws)); 
     this.players.forEach(({ socket }) => { 
       socket.send(JSON.stringify({
-        event: 'join', 
-        name
-      })); 
+        action: Actions.JOINED,
+        name 
+      }));
+    });
+    ws.on('message', (msg) => {
+      try {
+        const { action } = JSON.parse(msg); 
+        if(!action) {
+          throw new Error('No action specified'); 
+        }
+        switch(action) {
+          case Actions.LEAVE: 
+            this.remove_player(name); 
+            break;
+          case Actions.START:
+            throw new Error('Only host can start game'); 
+          case Actions.CANCEL:
+            throw new Error('Only host can cancel game'); 
+          default: 
+            throw new Error(`${action} action not recognized`); 
+        }
+      } catch({ message }) {
+        ws.send(JSON.stringify({
+          action: Actions.ERROR,
+          message 
+        })); 
+      }
     }); 
-    ws.on('close', (_, reason) => {
-      player.closed = true; 
-      this.remove_player(name, reason); 
-    }); 
-    return player; 
+    ws.on('close', this.remove_player.bind(this, name)); 
+    return true; 
   }
 
-  remove_player(name, reason) {
+  remove_player(name) {
     if(!this.players.has(name)) {
       return false; 
     }
-    const player = this.players.get(name); 
-    if(!player.closed) {
-      player.socket.close(1007, reason); 
-    }
+    this.players.get(name).close(); 
     this.players.delete(name); 
     this.players.forEach(({ socket }) => {
       socket.send(JSON.stringify({
-        event: 'leave',
+        action: Actions.LEFT,
         name
       })); 
     });
@@ -92,15 +127,22 @@ class Game {
   start() {
     this.started = true; 
     for(const player of this.players.values()) {
-      player.socket.send(JSON.stringify({ event: 'start' })); 
+      player.socket.send(JSON.stringify({
+        action: Actions.STARTED
+      })); 
     }
   }
 
   cancel() {
-    for(const name of this.players.keys()) {
-      this.remove_player(name, 'Game has been cancelled'); 
+    for(const player of this.players.values()) {
+      player.socket.send(JSON.stringify({
+        action: Actions.CANCELLED
+      })); 
     }
-    this.game_reg.games.delete(this.id); 
+    for(const name of this.players.keys()) {
+      this.remove_player(name); 
+    }
+    this.game_reg.delete_game(this.id); 
   }
 }
 
@@ -136,21 +178,25 @@ export default class GameRegistry {
     return null; 
   }
 
-  start_game(hostname, hostws) {
+  new_game(hostname, hostws) {
     const id = this.gen_game_id(); 
     if(id) {
       this.games.set(id, new Game(this, id, hostname, hostws)); 
       hostws.send(JSON.stringify({
-        event: 'host', 
+        action: Actions.HOSTED,
         id
       })); 
     } else {
       hostws.send(JSON.stringify({
-        event: 'error',
+        action: Actions.ERROR,
         message: 'Failed to generate game id'
       })); 
     }
     return id; 
   }
+  
+  delete_game(id) {
+    return this.games.delete(id); 
+  } 
 }
 
