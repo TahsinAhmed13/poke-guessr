@@ -15,6 +15,7 @@
  * QUESTION: choices: [string]
  * ANSWER: answer: int, correct: bool, leaderboard: [(string, int)]
  * ENDED: leaderboard: [(string, int)]
+ * ERROR: message: string
  */
 export const Actions = Object.freeze({
   NONE: 'none',

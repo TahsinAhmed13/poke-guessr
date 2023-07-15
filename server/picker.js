@@ -4,14 +4,15 @@ import fetch from 'node-fetch';
 const dbUrl = 'https://pokemondb.net/pokedex/shiny'; 
 
 export default class PokePicker {
-  constructor() {
+  constructor(gen = 0) {
+    this.gen = gen; 
     this.species = []; 
   }
 
-  async initialize(gen = 0) {
+  async initialize() {
     const html = await fetch(dbUrl).then(req => req.text()); 
     const $ = cheerio.load(html); 
-    const genSelector = gen ? `#gen-${gen} + div` : '*'; 
+    const genSelector = this.gen ? `#gen-${this.gen} + div` : '*'; 
     const infocards = $(genSelector).find('.infocard'); 
     this.species.length = 0; 
     infocards.find('.ent-name').each((_, element) => {

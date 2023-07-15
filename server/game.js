@@ -10,13 +10,14 @@ class Player {
 }
 
 class Round {
-  constructor(choices, answer, players) {
+  constructor(choices, answer, dataUrl, players) {
     this.choices = choices; 
     this.answer = answer; 
+    this.dataUrl = dataUrl; 
     this.players = players; 
   }
 
-  ready() {
+  ready(timeout = Infinity) {
     return new Promise((resolve) => {
       const responses = new Set(); 
       const callbacks = new Map(); 
@@ -56,10 +57,13 @@ class Round {
         socket.addEventListener('message', callbacks[name].onmessage); 
         socket.addEventListener('close', callbacks[name].onclose); 
       }  
+      if(timeout != Infinity) {
+        setTimeout(cleanup, timeout); 
+      }
     }); 
   }
 
-  run(timeout) {
+  run(timeout = Infinity) {
     return new Promise((resolve) => {
       const results = new Map(); 
       const callbacks = new Map(); 
@@ -72,7 +76,7 @@ class Round {
           socket.send(JSON.stringify({
             action: Actions.ANSWER,
             answer: this.answer,
-            correct: this.choices[this.answer] === results[name] 
+            correct: this.choices[this.answer] === results.get(name) 
           }));
         }); 
         resolve(results); 
@@ -120,7 +124,8 @@ class Round {
       this.players.forEach(({ socket }) => {
         socket.send(JSON.stringify({
           action: Actions.QUESTION,
-          choices: this.choices
+          choices: this.choices,
+          dataUrl: this.dataUrl 
         }));
       });
       if(timeout != Infinity) {
@@ -136,17 +141,21 @@ class Game {
       gen = 0,
       rounds = 10,
       count = 4,
-      timeout = Infinity // ie no timeout
+      timeouts = {}
     } = options; 
     this.game_reg = game_reg; 
     this.id = id; 
     this.started = false; 
     this.players = new Map(); 
     this.players.set(hostname, new Player(hostws));  
-    this.gen = gen; 
+    this.picker = new PokePicker(gen); 
     this.rounds = rounds; 
     this.count = count; 
-    this.timeout = timeout; 
+    this.timeouts = {
+      ready: Infinity,
+      run: Infinity,
+      ...timeouts
+    }
     hostws.on('message', async (msg) => {
       try {
         const { action = Actions.NONE } = JSON.parse(msg); 
@@ -276,14 +285,15 @@ class Game {
         action: Actions.STARTED
       }));
     }); 
-    const picker = new PokePicker(); 
-    await picker.initialize(this.gen);  
+    await this.picker.initialize(); 
     for(let i = 0; i < this.rounds; ++i) {
-      const choices = picker.pick(this.count); 
+      const choices = this.picker.pick(this.count); 
       const answer = Math.floor(Math.random() * this.count); 
-      const round = new Round(choices, answer, this.players); 
-      await round.ready(); 
-      await round.run(this.timeout); 
+      const species = choices[answer].toLowerCase().replace(' ', '-'); 
+      const dataUrl = await this.game_reg.ips.getDataUrl(species); 
+      const round = new Round(choices, answer, dataUrl, this.players); 
+      await round.ready(this.timeouts.ready); 
+      await round.run(this.timeouts.run); 
     } 
     this.players.forEach(({ socket }) => {
       socket.send(JSON.stringify({
@@ -310,13 +320,14 @@ class Game {
 export default class GameRegistry {
   static ALPHANUM_CHARSET = 'abcdefghijklmnopqrstuvwxyz123456789'; 
 
-  constructor(wss, options = {}) { 
+  constructor(wss, ips, options = {}) { 
     const {
       charset = GameRegistry.ALPHANUM_CHARSET,
       id_len = 6,
       tries = Infinity
     } = options; 
     this.wss = wss; 
+    this.ips = ips; 
     this.charset = charset; 
     this.id_len = Math.max(1, id_len); 
     this.tries = Math.max(1, tries); 

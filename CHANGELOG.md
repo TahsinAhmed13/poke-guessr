@@ -36,3 +36,4 @@
 
 * server
     * implement ready method in Round to synchronize players
+    * add base64 encoded URLs to QUESTION packets

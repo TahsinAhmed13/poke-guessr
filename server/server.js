@@ -1,12 +1,14 @@
 import http from 'node:http'; 
 import { WebSocketServer } from 'ws';
 import { Actions } from './protocol.js';
+import ImgProxyServer from './proxy.js';
 import GameRegistry from './game.js';
 
 const port = 8000; 
 const server = http.createServer(); 
 const wss = new WebSocketServer({ server }); 
-const game_reg = new GameRegistry(wss); 
+const ips = new ImgProxyServer(); 
+const game_reg = new GameRegistry(wss, ips); 
 
 wss.on('connection', (ws) => {
   ws.on('message', (msg) => {
