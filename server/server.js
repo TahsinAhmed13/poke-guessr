@@ -1,44 +1,57 @@
 import http from 'node:http'; 
-import { URL } from 'node:url';
 import { WebSocketServer } from 'ws';
+import { Actions } from './protocol.js';
 import GameRegistry from './game.js';
 
 const port = 8000; 
 const server = http.createServer(); 
 const wss = new WebSocketServer({ server }); 
-const game_reg = new GameRegistry(); 
+const game_reg = new GameRegistry(wss); 
 
-wss.on('connection', (ws, req) => {
-  const url = new URL(req.url, `ws://${req.headers.host}/`); 
-  const name = url.searchParams.get('name'); 
-  if(!name) {
-    ws.close(1007, 'No name provided'); 
-    return; 
-  }
-  switch(url.pathname) {
-    case '/api/host': 
-      if(!game_reg.new_game(name, ws)) {
-        ws.close(1007, 'Failed to create new game');   
+wss.on('connection', (ws) => {
+  ws.on('message', (msg) => {
+    try {
+      const {
+        action = Actions.NONE,
+        name, 
+        id,
+        options = {}
+      } = JSON.parse(msg); 
+      if(!name) {
+        throw new Error('No name specified'); 
       }
-      break; 
-    case '/api/join': 
-      const id = url.searchParams.get('id'); 
-      if(!id) {
-        ws.close(1007, 'No id provided'); 
-        return; 
+      switch(action) {
+        case Actions.NONE: 
+          throw new Error('No action specified'); 
+        case Actions.HOST: 
+          ws.removeAllListeners(); 
+          if(!game_reg.new_game(name, ws, options)) {
+            wss.emit('connection', ws);  
+          }
+          break;
+        case Actions.JOIN:
+          if(!id) {
+            throw new Error('No id specified'); 
+          }
+          const game = game_reg.get_game(id); 
+          if(!game) {
+            throw new Error(`Invalid game id '${id}'`); 
+          }
+          ws.removeAllListeners(); 
+          if(!game.add_player(name, ws)) {
+            wss.emit('connection', ws); 
+          }
+          break;
+        default: 
+          throw new Error(`Action '${action}' not recognized`);
       }
-      const game = game_reg.get_game(id); 
-      if(!game) {
-        ws.close(1007, `Invalid game id ${id}`); 
-        return; 
-      }
-      if(!game.add_player(name, ws)) {
-        ws.close(1007, `Failed to join game ${id}`);   
-      }
-      break;
-    default: 
-      ws.close(1007, 'Invalid endpoint'); 
-  }
+    } catch({ message }) {
+      ws.send(JSON.stringify({
+        action: Actions.ERROR,
+        message
+      }));
+    }
+  }); 
 }); 
 
 server.listen(port, () => {

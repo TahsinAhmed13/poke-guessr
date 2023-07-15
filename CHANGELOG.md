@@ -24,3 +24,10 @@
 
 * server
     * designed JSON-based communications protocol
+
+# 2023-07-13 - 2023-07-14
+
+* server
+    * overhauled protocol to exclusivly use JSON for all communications
+    * create Round class to asynchronously run rounds
+    * create Picker class to randomly select Pokemon
