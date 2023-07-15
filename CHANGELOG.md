@@ -31,3 +31,8 @@
     * overhauled protocol to exclusivly use JSON for all communications
     * create Round class to asynchronously run rounds
     * create Picker class to randomly select Pokemon
+
+# 2023-07-15
+
+* server
+    * implement ready method in Round to synchronize players

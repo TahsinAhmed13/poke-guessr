@@ -2,8 +2,7 @@ import { Actions } from "./protocol.js";
 import PokePicker from "./picker.js";
 
 class Player {
-  constructor(name, socket) {
-    this.name = name; 
+  constructor(socket) {
     this.socket = socket; 
     this.closed = false; 
     this.socket.on('close', () => this.closed = true); 
@@ -17,58 +16,87 @@ class Round {
     this.players = players; 
   }
 
+  ready() {
+    return new Promise((resolve) => {
+      const responses = new Set(); 
+      const callbacks = new Map(); 
+      const cleanup = () => {
+        this.players.forEach(({ socket }, name) => {
+          socket.removeEventListener('message', callbacks[name].onmessage); 
+          socket.removeEventListener('close', callbacks[name].onclose); 
+        }); 
+        resolve(responses); 
+      }
+      for(const [ name, { socket } ] of this.players.entries()) {
+        callbacks[name] = {
+          onmessage: ({ data }) => { 
+            try {
+              const { action } = JSON.parse(data);              
+              if(action === Actions.READY) {
+                responses.add(name); 
+                if(responses.size >= this.players.size) {
+                  cleanup(); 
+                }
+              }
+            } catch({ message }) {
+              console.log(message); 
+              socket.send(JSON.stringify({
+                action: Actions.ERROR,
+                message 
+              }));  
+            }
+          },
+          onclose: () => {
+            responses.delete(name); 
+            if(responses.size >= this.players.size) {
+              cleanup(); 
+            }  
+          }
+        };
+        socket.addEventListener('message', callbacks[name].onmessage); 
+        socket.addEventListener('close', callbacks[name].onclose); 
+      }  
+    }); 
+  }
+
   run(timeout) {
     return new Promise((resolve) => {
-      const results = new Array(this.players.length).fill('');  
-      const callbacks = new Array(this.players.length); 
+      const results = new Map(); 
+      const callbacks = new Map(); 
       const cleanup = () => {
-        for(let i = 0; i < this.players.length; ++i) {
-          const { socket } = this.players[i]; 
-          socket.removeEventListener('message', callbacks[i].onmessage); 
-          socket.removeEventListener('message', callbacks[i].onclose); 
-        }
-        for(let i = 0; i < this.players.length; ++i) {
-          const { socket } = this.players[i]; 
+        this.players.forEach(({ socket }, name) => {
+          socket.removeEventListener('message', callbacks[name].onmessage); 
+          socket.removeEventListener('close', callbacks[name].onclose); 
+        }); 
+        this.players.forEach(({ socket }, name) => {
           socket.send(JSON.stringify({
             action: Actions.ANSWER,
             answer: this.answer,
-            correct: this.choices[this.answer] === results[i] 
-          })); 
-        } 
+            correct: this.choices[this.answer] === results[name] 
+          }));
+        }); 
         resolve(results); 
       }
-      for(const { socket } of this.players) {
-        socket.send(JSON.stringify({
-          action: Actions.QUESTION,
-          choices: this.choices
-        }));
-      }
-      let responses = 0; 
-      for(let i = 0; i < this.players.length; ++i) {
-        const { name, socket } = this.players[i]; 
-        callbacks[i] = {
+      for(const [ name, { socket } ] of this.players.entries()) {
+        callbacks[name] = {
           onmessage: ({ data }) => { 
             try {
               const { action, selection } = JSON.parse(data);              
               if(action === Actions.RESPOND) {
-                if(!selection) {
-                  throw new Error('No selection specified'); 
-                }
                 if(!this.choices[selection]) {
-                  throw new Error('Invalid selection'); 
+                  throw new Error('No selection or selection invalid'); 
                 }
-                if(results[i]) {
+                if(results.has(name)) {
                   throw new Error('Already responded'); 
                 }
-                results[i] = this.choices[selection]; 
-                responses++; 
+                results.set(name, this.choices[selection]); 
                 this.players.forEach(({ socket }) => {
                   socket.send(JSON.stringify({
                     action: Actions.RESPONDED,
                     name
                   })); 
                 }); 
-                if(responses >= this.players.length) {
+                if(results.size >= this.players.size) {
                   cleanup(); 
                 }
               }
@@ -80,17 +108,21 @@ class Round {
             }
           },
           onclose: () => {
-            if(!results[i]) {
-              responses++; 
-              if(responses >= this.players.length) {
-                cleanup(); 
-              }
-            }
+            results.delete(name); 
+            if(results.size >= this.players.size) {
+              cleanup(); 
+            }  
           }
         }; 
-        socket.addEventListener('message', callbacks[i].onmessage); 
-        socket.addEventListener('close', callbacks[i].onclose); 
+        socket.addEventListener('message', callbacks[name].onmessage); 
+        socket.addEventListener('close', callbacks[name].onclose); 
       }
+      this.players.forEach(({ socket }) => {
+        socket.send(JSON.stringify({
+          action: Actions.QUESTION,
+          choices: this.choices
+        }));
+      });
       if(timeout != Infinity) {
         setTimeout(cleanup, timeout); 
       }
@@ -110,7 +142,7 @@ class Game {
     this.id = id; 
     this.started = false; 
     this.players = new Map(); 
-    this.players.set(hostname, new Player(hostname, hostws));  
+    this.players.set(hostname, new Player(hostws));  
     this.gen = gen; 
     this.rounds = rounds; 
     this.count = count; 
@@ -141,6 +173,8 @@ class Game {
             } else {
               throw new Error(`Game '${this.id}' alreday started`); 
             }
+            break; 
+          case Actions.READY: 
             break; 
           case Actions.RESPOND: 
             break; 
@@ -178,7 +212,7 @@ class Game {
       }));
       return false; 
     }
-    this.players.set(name, new Player(name, ws)); 
+    this.players.set(name, new Player(ws)); 
     this.players.forEach(({ socket }) => { 
       socket.send(JSON.stringify({
         action: Actions.JOINED,
@@ -198,6 +232,8 @@ class Game {
             throw new Error(`Only host can start game '${this.id}'`); 
           case Actions.CANCEL:
             throw new Error(`Only host can cancel game '${this.id}'`); 
+          case Actions.READY: 
+            break; 
           case Actions.RESPOND: 
             break; 
           default: 
@@ -235,30 +271,38 @@ class Game {
   
   async start() {
     this.started = true; 
-    for(const player of this.players.values()) {
-      player.socket.send(JSON.stringify({
+    this.players.forEach(({ socket }) => {
+      socket.send(JSON.stringify({
         action: Actions.STARTED
-      })); 
-    }
+      }));
+    }); 
     const picker = new PokePicker(); 
     await picker.initialize(this.gen);  
     for(let i = 0; i < this.rounds; ++i) {
       const choices = picker.pick(this.count); 
       const answer = Math.floor(Math.random() * this.count); 
-      const round = new Round(choices, answer, Array.from(this.players.values())); 
+      const round = new Round(choices, answer, this.players); 
+      await round.ready(); 
       await round.run(this.timeout); 
     } 
+    this.players.forEach(({ socket }) => {
+      socket.send(JSON.stringify({
+        action: Actions.ENDED
+      }));
+    }); 
+    const names = Array.from(this.players.keys()); 
+    names.forEach((name) => this.remove_player(name)); 
+    this.game_reg.games.delete(this.id); 
   }
 
   cancel() {
-    for(const player of this.players.values()) {
-      player.socket.send(JSON.stringify({
+    this.players.forEach(({ socket }) => {
+      socket.send(JSON.stringify({
         action: Actions.CANCELLED
-      })); 
-    }
-    for(const { name } of this.players.values()) {
-      this.remove_player(name); 
-    }
+      }));
+    }); 
+    const names = Array.from(this.players.keys()); 
+    names.forEach((name) => this.remove_player(name)); 
     this.game_reg.games.delete(this.id); 
   }
 }
