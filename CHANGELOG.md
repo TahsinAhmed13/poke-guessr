@@ -37,3 +37,9 @@
 * server
     * implement ready method in Round to synchronize players
     * add base64 encoded URLs to QUESTION packets
+
+# 2023-07-16
+
+* server
+    * add scoring system and leaderboard
+    * add better error messages

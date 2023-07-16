@@ -1,10 +1,11 @@
+import 'dotenv/config.js'
 import http from 'node:http'; 
 import { WebSocketServer } from 'ws';
 import { Actions } from './protocol.js';
 import ImgProxyServer from './proxy.js';
 import GameRegistry from './game.js';
 
-const port = 8000; 
+const port = process.env.SERVER_PORT || 8000; 
 const server = http.createServer(); 
 const wss = new WebSocketServer({ server }); 
 const ips = new ImgProxyServer(); 
