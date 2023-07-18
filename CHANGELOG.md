@@ -6,7 +6,7 @@
 * server
     * create endpoint for getting sprites via proxy
     * create endpoint for getting random Pokemon spcies
-<img alt="pixelchu" src="scrots/pixelchu.PNG" width="250"/>
+<img alt="07_02_23" src="scrots/changelog/07_02_23.PNG" width="250"/>
 
 # 2023-07-10
 
@@ -43,3 +43,13 @@
 * server
     * add scoring system and leaderboard
     * add better error messages
+
+# 2023-07-17
+
+* client
+    * create websocket controller for recieving messages from client
+    * create simple UI to host, join, and leave games
+* server
+    * change specs of HOSTED, JOINED, and LEFT packets to include all players
+    * add logging for new and closed connections
+<img alt="07_17_23" src="scrots/changelog/07_17_23.PNG" width="250"/>

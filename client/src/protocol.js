@@ -1,4 +1,6 @@
 /**
+ * Replicated from server! See server/src/protocol.js. 
+ * 
  * Protocol for websocket communications between server and client.
  * All requests and responses are JSON-encoded strings.
  * 
@@ -16,6 +18,7 @@
  * ANSWER: answer: int, correct: bool, leaderboard: [(string, int)]
  * ENDED: leaderboard: [(string, int)]
  * ERROR: message: string
+
  */
 export const Actions = Object.freeze({
   NONE: 'none',

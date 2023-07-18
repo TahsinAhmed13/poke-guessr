@@ -250,6 +250,11 @@ class Game {
         this.remove_player(hostname); 
       }
     }); 
+    hostws.send(JSON.stringify({
+      action: Actions.HOSTED,
+      id: this.id,
+      players: Array.from(this.players.keys())
+    })); 
   } 
 
   add_player(name, ws) {
@@ -271,7 +276,8 @@ class Game {
     this.players.forEach(({ socket }) => { 
       socket.send(JSON.stringify({
         action: Actions.JOINED,
-        name 
+        id: this.id,
+        players: Array.from(this.players.keys()) 
       }));
     });
     ws.on('message', (msg) => {
@@ -312,25 +318,29 @@ class Game {
   }
 
   remove_player(name) {
-    if(!this.players.has(name)) {
-      return null; 
-    }
-    const player = this.players.get(name); 
-    this.players.forEach(({ socket }) => {
+    if(this.players.has(name)) {
+      const { socket, closed } = this.players.get(name); 
+      this.players.delete(name);
+      this.players.forEach(({ socket }) => {
+        socket.send(JSON.stringify({
+          action: Actions.LEFT,
+          id: this.id,
+          players: Array.from(this.players.keys())
+        })); 
+      });
       socket.send(JSON.stringify({
         action: Actions.LEFT,
-        name
+        id: '',
+        players: []
       })); 
-    });
-    this.players.delete(name);
-    if(!player.closed) {
-      player.socket.removeAllListeners(); 
-      this.game_reg.wss.emit('connection', player.socket); 
-    } 
-    if(!this.players.size) {
-      this.game_reg.games.delete(this.id); 
+      if(!closed) {
+        socket.removeAllListeners(); 
+        this.game_reg.wss.emit('connection', socket); 
+      }
+      if(!this.players.size) {
+        this.game_reg.games.delete(this.id); 
+      }
     }
-    return player; 
   }
   
   async start() {
@@ -409,10 +419,6 @@ export default class GameRegistry {
     const id = this.gen_game_id(); 
     if(id) {
       this.games.set(id, new Game(this, id, hostname, hostws, options)); 
-      hostws.send(JSON.stringify({
-        action: Actions.HOSTED,
-        id
-      })); 
     } else {
       hostws.send(JSON.stringify({
         action: Actions.ERROR,

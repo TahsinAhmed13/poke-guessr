@@ -11,7 +11,11 @@ const wss = new WebSocketServer({ server });
 const ips = new ImgProxyServer(); 
 const game_reg = new GameRegistry(wss, ips); 
 
-wss.on('connection', (ws) => {
+wss.on('connection', (ws, req) => {
+  if(req) {
+    console.log(`New connection from ${req.url}`); 
+  }
+  ws.on('close', () => console.log(`Close connection from ${req.url}`)); 
   ws.on('message', (msg) => {
     try {
       const {
@@ -20,19 +24,23 @@ wss.on('connection', (ws) => {
         id,
         options = {}
       } = JSON.parse(msg); 
-      if(!name) {
-        throw new Error('No name specified'); 
-      }
       switch(action) {
         case Actions.NONE: 
           throw new Error('No action specified'); 
         case Actions.HOST: 
+          if(!name) {
+            throw new Error('No name specified'); 
+          }
           ws.removeAllListeners(); 
+          ws.on('close', () => console.log(`Close connection from ${req.url}`)); 
           if(!game_reg.new_game(name, ws, options)) {
             wss.emit('connection', ws);  
           }
           break;
         case Actions.JOIN:
+          if(!name) {
+            throw new Error('No name specified'); 
+          }
           if(!id) {
             throw new Error('No id specified'); 
           }
@@ -41,6 +49,7 @@ wss.on('connection', (ws) => {
             throw new Error(`Invalid game id '${id}'`); 
           }
           ws.removeAllListeners(); 
+          ws.on('close', () => console.log(`Close connection from ${req.url}`)); 
           if(!game.add_player(name, ws)) {
             wss.emit('connection', ws); 
           }
