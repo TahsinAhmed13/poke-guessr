@@ -1,15 +1,20 @@
+import { uptime } from 'node:process';
 import { Actions } from "./protocol.js";
 import PokePicker from "./picker.js";
 
 const BASE_POINTS_PER_ROUND = 100;
 
 class Player {
-  constructor(socket) {
+  constructor(socket, request) {
     this.closed = false; 
     this.socket = socket; 
-    this.socket.on('close', () => this.closed = true); 
+    this.request = request;  
     this.score = 0; 
     this.streak = 0;  
+    this.socket.on('close', () => {
+      this.closed = true; 
+      console.log(`[${Math.floor(uptime())}] Close connection from ${request.headers.host}${request.url}`); 
+    });
   }
 
   update(correct) {
@@ -88,6 +93,9 @@ class Round {
         player.socket.addEventListener('message', callbacks[name].onmessage); 
         player.socket.addEventListener('close', callbacks[name].onclose); 
       }  
+      this.players.forEach(({ socket }) => 
+        socket.send(JSON.stringify({ action: Actions.STARTED })) 
+      ); 
       if(timeout != Infinity) {
         setTimeout(cleanup, timeout); 
       }
@@ -117,23 +125,23 @@ class Round {
         callbacks[name] = {
           onmessage: ({ data }) => { 
             try {
-              const { action, selection } = JSON.parse(data);              
+              const { action, choice } = JSON.parse(data);              
               switch(action) {
                 case Actions.READY: 
                   throw new Error('Round already started'); 
                 case Actions.RESPOND:
-                  if(!this.choices[selection]) {
-                    throw new Error('No selection or selection invalid'); 
+                  if(!this.choices[choice]) {
+                    throw new Error('No choice or choice invalid'); 
                   }
                   if(results.has(name)) {
                     throw new Error('Already responded'); 
                   }
-                  results.set(name, this.choices[selection]); 
-                  player.update(selection === this.answer); 
+                  results.set(name, this.choices[choice]); 
+                  player.update(choice === this.answer); 
                   this.players.forEach(({ socket }) => {
                     socket.send(JSON.stringify({
                       action: Actions.RESPONDED,
-                      name
+                      count: results.size 
                     })); 
                   }); 
                   if(results.size >= this.players.size) {
@@ -174,7 +182,7 @@ class Round {
 }
 
 class Game {
-  constructor(game_reg, id, hostname, hostws, options = {}) {
+  constructor(game_reg, id, hostname, hostws, hostreq, options = {}) {
     const {
       gen = 0,
       rounds = 10,
@@ -186,7 +194,7 @@ class Game {
     this.id = id; 
     this.started = false; 
     this.players = new Map(); 
-    this.players.set(hostname, new Player(hostws));  
+    this.players.set(hostname, new Player(hostws, hostreq));  
     this.picker = new PokePicker(gen); 
     this.rounds = rounds; 
     this.count = count; 
@@ -213,24 +221,24 @@ class Game {
             if(!this.started) {
               await this.start(); 
             } else {
-              throw new Error(`Game '${this.id}' already started`); 
+              throw new Error('Game already started'); 
             }
             break;
           case Actions.CANCEL:
             if(!this.started) {
               this.cancel(); 
             } else {
-              throw new Error(`Game '${this.id}' alreday started`); 
+              throw new Error('Game alreday started'); 
             }
             break; 
           case Actions.READY: 
             if(!this.started) {
-              throw new Error(`Game '${this.id}' has not started yet`);  
+              throw new Error('Game has not started yet');  
             }
             break; 
           case Actions.RESPOND: 
             if(!this.started) {
-              throw new Error(`Game '${this.id}' has not started yet`); 
+              throw new Error('Game has not started yet'); 
             }
             break; 
           default: 
@@ -257,7 +265,7 @@ class Game {
     })); 
   } 
 
-  add_player(name, ws) {
+  add_player(name, ws, req) {
     if(this.players.has(name)) {
       ws.send(JSON.stringify({
         action: Actions.ERROR,
@@ -268,11 +276,11 @@ class Game {
     if(this.started) {
       ws.send(JSON.stringify({
         action: Actions.ERROR,
-        message: `Game '${this.id}' already started` 
+        message: 'Game already started' 
       }));
       return false; 
     }
-    this.players.set(name, new Player(ws)); 
+    this.players.set(name, new Player(ws, req)); 
     this.players.forEach(({ socket }) => { 
       socket.send(JSON.stringify({
         action: Actions.JOINED,
@@ -290,17 +298,17 @@ class Game {
             this.remove_player(name); 
             break;
           case Actions.START:
-            throw new Error(`Only host can start game '${this.id}'`); 
+            throw new Error('Only host can start game'); 
           case Actions.CANCEL:
-            throw new Error(`Only host can cancel game '${this.id}'`); 
+            throw new Error('Only host can cancel game'); 
           case Actions.READY: 
             if(!this.started) {
-              throw new Error(`Game '${this.id}' has not started yet`); 
+              throw new Error('Game has not started yet'); 
             }
             break; 
           case Actions.RESPOND: 
             if(!this.started) {
-              throw new Error(`Game '${this.id}' has not started yet`); 
+              throw new Error('Game has not started yet'); 
             }
             break; 
           default: 
@@ -319,7 +327,7 @@ class Game {
 
   remove_player(name) {
     if(this.players.has(name)) {
-      const { socket, closed } = this.players.get(name); 
+      const { closed, socket, request } = this.players.get(name); 
       this.players.delete(name);
       this.players.forEach(({ socket }) => {
         socket.send(JSON.stringify({
@@ -335,7 +343,7 @@ class Game {
       })); 
       if(!closed) {
         socket.removeAllListeners(); 
-        this.game_reg.wss.emit('connection', socket); 
+        this.game_reg.wss.emit('connection', socket, request); 
       }
       if(!this.players.size) {
         this.game_reg.games.delete(this.id); 
@@ -345,11 +353,7 @@ class Game {
   
   async start() {
     this.started = true; 
-    this.players.forEach(({ socket }) => {
-      socket.send(JSON.stringify({
-        action: Actions.STARTED
-      }));
-    }); 
+    this.game_reg.games.delete(this.id); 
     await this.picker.initialize(); 
     for(let i = 0; i < this.rounds; ++i) {
       const choices = this.picker.pick(this.count); 
@@ -366,18 +370,15 @@ class Game {
         leaderboard: Player.get_leaderboard(this.players)
       }));
     }); 
-    this.players.forEach((_, name) => this.remove_player(name)); 
-    this.game_reg.games.delete(this.id); 
+    this.players.clear();  
   }
 
   cancel() {
-    this.players.forEach(({ socket }) => {
-      socket.send(JSON.stringify({
-        action: Actions.CANCELLED
-      }));
-    }); 
-    this.players.forEach((_, name) => this.remove_player(name)); 
     this.game_reg.games.delete(this.id); 
+    this.players.forEach(({ socket }) =>
+      socket.send(JSON.stringify({ action: Actions.CANCELLED }))
+    ); 
+    this.players.clear(); 
   }
 }
 
@@ -415,10 +416,10 @@ export default class GameRegistry {
     return null; 
   }
 
-  new_game(hostname, hostws, options = {}) {
+  new_game(hostname, hostws, hostreq, options = {}) {
     const id = this.gen_game_id(); 
     if(id) {
-      this.games.set(id, new Game(this, id, hostname, hostws, options)); 
+      this.games.set(id, new Game(this, id, hostname, hostws, hostreq, options)); 
     } else {
       hostws.send(JSON.stringify({
         action: Actions.ERROR,

@@ -1,5 +1,6 @@
 import 'dotenv/config.js'
 import http from 'node:http'; 
+import { uptime } from 'node:process';
 import { WebSocketServer } from 'ws';
 import { Actions } from './protocol.js';
 import ImgProxyServer from './proxy.js';
@@ -12,10 +13,10 @@ const ips = new ImgProxyServer();
 const game_reg = new GameRegistry(wss, ips); 
 
 wss.on('connection', (ws, req) => {
-  if(req) {
-    console.log(`New connection from ${req.url}`); 
-  }
-  ws.on('close', () => console.log(`Close connection from ${req.url}`)); 
+  console.log(`[${Math.floor(uptime())}] New connection from ${req.headers.host}${req.url}`); 
+  ws.on('close', () => 
+    console.log(`[${Math.floor(uptime())}] Close connection from ${req.headers.host}${req.url}`)
+  ); 
   ws.on('message', (msg) => {
     try {
       const {
@@ -24,6 +25,7 @@ wss.on('connection', (ws, req) => {
         id,
         options = {}
       } = JSON.parse(msg); 
+      const game = game_reg.get_game(id); 
       switch(action) {
         case Actions.NONE: 
           throw new Error('No action specified'); 
@@ -32,9 +34,8 @@ wss.on('connection', (ws, req) => {
             throw new Error('No name specified'); 
           }
           ws.removeAllListeners(); 
-          ws.on('close', () => console.log(`Close connection from ${req.url}`)); 
-          if(!game_reg.new_game(name, ws, options)) {
-            wss.emit('connection', ws);  
+          if(!game_reg.new_game(name, ws, req, options)) {
+            wss.emit('connection', ws, req);  
           }
           break;
         case Actions.JOIN:
@@ -44,14 +45,12 @@ wss.on('connection', (ws, req) => {
           if(!id) {
             throw new Error('No id specified'); 
           }
-          const game = game_reg.get_game(id); 
           if(!game) {
-            throw new Error(`Invalid game id '${id}'`); 
+            throw new Error('Invalid game id'); 
           }
           ws.removeAllListeners(); 
-          ws.on('close', () => console.log(`Close connection from ${req.url}`)); 
-          if(!game.add_player(name, ws)) {
-            wss.emit('connection', ws); 
+          if(!game.add_player(name, ws, req)) {
+            wss.emit('connection', ws, req); 
           }
           break;
         default: 

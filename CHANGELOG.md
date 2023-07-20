@@ -53,3 +53,13 @@
     * change specs of HOSTED, JOINED, and LEFT packets to include all players
     * add logging for new and closed connections
 <img alt="07_17_23" src="scrots/changelog/07_17_23.PNG" width="250"/>
+
+# 2023-07-19
+
+* client
+    * create root, host, join, lobby, and game routes
+    * organize data flow and navigation between pages
+* server
+    * changed STARTED packets to be delievered before each round
+    * improved logging by adding server uptime
+<img alt="07_19_23" src="scrots/changelog/07_19_23.PNG" width="250">
