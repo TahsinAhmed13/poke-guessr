@@ -63,3 +63,9 @@
     * changed STARTED packets to be delievered before each round
     * improved logging by adding server uptime
 <img alt="07_19_23" src="scrots/changelog/07_19_23.PNG" width="250">
+
+# 2023-07-20
+
+* client
+    * design phase system to direct between pages
+    * finish prototype on layout for game

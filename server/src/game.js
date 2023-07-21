@@ -115,7 +115,7 @@ class Round {
           socket.send(JSON.stringify({
             action: Actions.ANSWER,
             answer: this.answer,
-            correct: this.choices[this.answer] === results.get(name),
+            correct: this.choices[this.answer-1] === results.get(name),
             leaderboard: Player.get_leaderboard(this.players)
           }));
         }); 
@@ -130,13 +130,13 @@ class Round {
                 case Actions.READY: 
                   throw new Error('Round already started'); 
                 case Actions.RESPOND:
-                  if(!this.choices[choice]) {
+                  if(!this.choices[choice-1]) {
                     throw new Error('No choice or choice invalid'); 
                   }
                   if(results.has(name)) {
                     throw new Error('Already responded'); 
                   }
-                  results.set(name, this.choices[choice]); 
+                  results.set(name, this.choices[choice-1]); 
                   player.update(choice === this.answer); 
                   this.players.forEach(({ socket }) => {
                     socket.send(JSON.stringify({
@@ -357,27 +357,29 @@ class Game {
     await this.picker.initialize(); 
     for(let i = 0; i < this.rounds; ++i) {
       const choices = this.picker.pick(this.count); 
-      const answer = Math.floor(Math.random() * this.count); 
-      const species = choices[answer].toLowerCase().replace(' ', '-'); 
+      const answer = Math.floor(Math.random() * this.count) + 1; 
+      const species = choices[answer-1].toLowerCase().replace(' ', '-'); 
       const dataUrl = await this.game_reg.ips.getDataUrl(species); 
       const round = new Round(choices, answer, dataUrl, this.pixelation, this.players); 
       await round.ready(this.timeouts.ready); 
       await round.run(this.timeouts.run); 
     } 
-    this.players.forEach(({ socket }) => {
+    this.players.forEach(({ socket, request }) => {
       socket.send(JSON.stringify({
         action: Actions.ENDED,
         leaderboard: Player.get_leaderboard(this.players)
       }));
+      this.game_reg.wss.emit('connection', socket, request); 
     }); 
     this.players.clear();  
   }
 
   cancel() {
     this.game_reg.games.delete(this.id); 
-    this.players.forEach(({ socket }) =>
-      socket.send(JSON.stringify({ action: Actions.CANCELLED }))
-    ); 
+    this.players.forEach(({ socket, request }) => {
+      socket.send(JSON.stringify({ action: Actions.CANCELLED })); 
+      this.game_reg.wss.emit('connection', socket, request); 
+    }); 
     this.players.clear(); 
   }
 }
