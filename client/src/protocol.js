@@ -10,9 +10,9 @@
  * RESPOND: selection: int
  * 
  * Recieved field from server actions: 
- * HOSTED: id: string, name: string, players: [string]
- * JOINED: id: string, name: string, players: [string]
- * LEFT: id: string, name: string, players: [string]
+ * HOSTED: id: string, players: [string]
+ * JOINED: id: string, players: [string]
+ * LEFT: id: string, players: [string]
  * RESPONDED: name: string
  * QUESTION: choices: [string]
  * ANSWER: answer: int, correct: bool, leaderboard: [(string, int)]

@@ -1,0 +1,176 @@
+button, 
+input[type="submit"] {
+  background-color: cornflowerblue;
+  outline: none; 
+  border: none; 
+  border-radius: 5px;
+  cursor: pointer;
+  box-shadow: 0 8px black;
+}
+
+button:enabled:hover, 
+input[type="submit"]:enabled:hover {
+  box-shadow: 0 3px black;
+  transform: translateY(5px);
+}
+
+h1, h2 {
+  text-shadow: 2px 5px 5px black;
+  color: #f0f0f0; 
+}
+
+h1 {
+  font-size: 64px; 
+}
+
+h2 {
+  font-size: 28px; 
+}
+
+body {
+  background-color: #ee1515; 
+}
+
+.navbar {
+  background-color: #222224;
+}
+
+.navbar a {
+  color: dimgray; 
+  text-decoration: none;
+  font-size: 18px; 
+}
+
+.navbar a:hover {
+  color: #f0f0f0; 
+}
+
+.home, .host, .join, .lobby {
+  position: relative; 
+  align-items: center;
+  font-size: 36px; 
+}
+
+.home {
+  top: 15vh; 
+}
+
+.host {
+  top: 30vh; 
+}
+
+.join {
+  top: 25vh; 
+}
+
+.lobby {
+  top: 10vh; 
+}
+
+.home-titles {
+  align-items: center;
+}
+
+.home button,
+.host input[type="submit"],
+.join input[type="submit"],
+.lobby button {
+  width: 40%; 
+}
+
+.host input[type="text"],
+.join input[type="text"] {
+  width: 70%; 
+}
+
+.floor {
+  box-sizing: border-box;
+  width: 80%; 
+  height: 45vh; 
+  background-color: #FAA0A0;
+  overflow-x: hidden; 
+  overflow-y: auto; 
+}
+
+.floor ul {
+  list-style-type: none;
+  display: flex; 
+  flex-wrap: wrap;
+}
+
+/* sm */
+@media (min-width: 576px) {
+  .home button,
+  .host input[type="submit"],
+  .join input[type="submit"],
+  .lobby button {
+    width: 30%; 
+  }
+
+  .host input[type="text"],
+  .join input[type="text"] {
+    width: 60%; 
+  }
+
+  .floor {
+    width: 75%; 
+  }
+}
+
+/* md */
+@media (min-width: 768px) {
+  .home button,
+  .host input[type="submit"],
+  .join input[type="submit"],
+  .lobby button {
+    width: 25%; 
+  }
+
+  .host input[type="text"],
+  .join input[type="text"] {
+    width: 50%; 
+  }
+  
+  .floor {
+    width: 70%; 
+  }
+}
+
+/* lg */
+@media (min-width: 992px) {
+  .home button,
+  .host input[type="submit"],
+  .join input[type="submit"],
+  .lobby button {
+    width: 20%; 
+  }
+
+  .host input[type="text"],
+  .join input[type="text"] {
+    width: 40%; 
+  }
+
+  .floor {
+    width: 65%; 
+  }
+}
+
+/* xl */
+@media (min-width: 1200px) {
+  .home button,
+  .host input[type="submit"],
+  .join input[type="submit"],
+  .lobby button {
+    width: 15%; 
+  }
+
+  .host input[type="text"],
+  .join input[type="text"] {
+    width: 30%; 
+  }
+
+  .floor {
+    width: 60%; 
+  }
+}
+

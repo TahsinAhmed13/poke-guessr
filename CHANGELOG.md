@@ -62,10 +62,23 @@
 * server
     * changed STARTED packets to be delievered before each round
     * improved logging by adding server uptime
-<img alt="07_19_23" src="scrots/changelog/07_19_23.PNG" width="250">
+<img alt="07_19_23" src="scrots/changelog/07_19_23.PNG" width="250"/>
 
 # 2023-07-20
 
 * client
     * design phase system to direct between pages
     * finish prototype on layout for game
+
+# 2023-07-23
+
+* client
+    * finalize designs for home, host, join, and lobby pages
+    * add navigation bar for all pages
+
+<div style="display: flex;">
+    <img alt="07_23_23_01" src="scrots/changelog/07_23_23_01.PNG" width="250"/>
+    <img alt="07_23_23_02" src="scrots/changelog/07_23_23_02.PNG" width="250"/>
+    <img alt="07_23_23_03" src="scrots/changelog/07_23_23_03.PNG" width="250"/>
+    <img alt="07_23_23_04" src="scrots/changelog/07_23_23_04.PNG" width="250"/>
+</div>

@@ -7,10 +7,18 @@ import {
 } from 'react';
 import {
   createBrowserRouter,
+  Link,
   RouterProvider,
   useNavigate,
 } from 'react-router-dom'; 
+import logo from './logo.png'
+import './App.css'; 
 import { Actions } from './protocol'; 
+
+import BSForm from 'react-bootstrap/Form';
+import BSStack from 'react-bootstrap/Stack'; 
+import BSNav from 'react-bootstrap/Nav'; 
+import BSNavbar from 'react-bootstrap/Navbar'; 
 
 const Phases = Object.freeze({
   IDLEING: Symbol('IDLEING'),
@@ -22,8 +30,9 @@ const Phases = Object.freeze({
 const GameContext = createContext();  
 
 export default function App() {
+  /* GLOBALS */
   const [socket, setSocket] = useState(null); 
-  const [phase, setPhase] = useState(Phases.NONE); 
+  const [phase, setPhase] = useState(Phases.IDLEING); 
   const [errMsg, setErrMsg] = useState(''); 
   /* WAITING PHASE */
   const [id, setId] = useState(''); 
@@ -39,23 +48,43 @@ export default function App() {
   const router = createBrowserRouter([
     {
       path: '/',
-      element: <Root/>,
+      element: (
+        <>
+          <Navbar/>
+          <Home/>
+        </>
+      ),
     },
     {
       path: '/host',
-      element: <Host/>,
+      element: (
+        <>
+          <Navbar/>
+          <Host/>
+        </>
+      ),
     },
     {
       path: '/join',
-      element: <Join/>,
+      element: (
+        <>
+          <Navbar/>
+          <Join/>
+        </>
+      ),
     },
     {
       path: '/lobby',
-      element: <Lobby 
-        id={id} 
-        players={players}
-        isHost={isHost} 
-      />,
+      element: (
+        <>
+          <Navbar/>
+          <Lobby
+            id={id}
+            players={players}
+            isHost={isHost}
+          />
+        </>
+      ),
     },
     {
       path: '/play',
@@ -139,93 +168,194 @@ export default function App() {
   ); 
 }
 
-function Root() {
+function Navbar() {
+  const { socket, phase } = useContext(GameContext); 
+  
+  const confirmNavigation = (event) => {
+    if(phase !== Phases.IDLEING) {
+      const confirmation = window.confirm('Are you sure you want to leave this game?'); 
+      if(confirmation) {
+        socket.send(JSON.stringify({ action: Actions.LEAVE })); 
+      } else {
+        event.preventDefault(); 
+      }
+    }
+  }; 
+
+  return (
+    <BSNavbar fixed='top' className='navbar shadow'>
+      <BSNavbar.Brand className='ms-3'>
+        <Link to='/' onClick={confirmNavigation}>
+          <img src={logo} alt='Shiny Charm' width='30'/>
+        </Link>
+      </BSNavbar.Brand>
+      <BSNav className='me-auto'>
+        <BSNav.Link>
+          <Link to='/host' onClick={confirmNavigation}>Host</Link>
+        </BSNav.Link>
+        <BSNav.Link>
+          <Link to='/join' onClick={confirmNavigation}>Join</Link>
+        </BSNav.Link>
+      </BSNav>
+    </BSNavbar>
+  ); 
+}
+
+function Home() {
   const navigate = useNavigate(); 
 
   return (
-    <div>
-      <h1>Poke Guessr</h1>
-      <button onClick={() => navigate('/host')}>Host</button><br/>
-      <button onClick={() => navigate('/join')}>Join</button><br/>
-    </div>
+    <BSStack className='home' gap={4}>
+      <BSStack className='home-titles' gap={1}>
+        <h1>PokéGuessr</h1>
+        <h2>Shiny Edition</h2>
+      </BSStack>
+      <button onClick={() => navigate('/host')}>Host</button>
+      <button onClick={() => navigate('/join')}>Join</button>
+    </BSStack>
   ); 
 }
 
 function Host() {
   const { socket , phase, errMsg } = useContext(GameContext); 
   const navigate = useNavigate(); 
+  const [waiting, setWaiting] = useState(false); 
+  const hostBtnRef = useRef(); 
 
   useEffect(() => {
     let ignore = false; 
-    if(!ignore && phase === Phases.WAITING) {
-      navigate('/lobby'); 
+    if(!ignore)  {
+      if(phase === Phases.WAITING) {
+        setWaiting(false); 
+        navigate('/lobby'); 
+      } else if(errMsg) {
+        setWaiting(false);  
+        hostBtnRef.current.setCustomValidity(errMsg); 
+        hostBtnRef.current.reportValidity(); 
+      }
     }
     return () => ignore = true; 
-  }, [phase, navigate]); 
+  }, [phase, errMsg, navigate]); 
 
   const handleSubmit = (event) => {
     event.preventDefault(); 
+    setWaiting(true); 
     const formData = new FormData(event.target); 
     const { name } = Object.fromEntries(formData); 
     socket.send(JSON.stringify({ action: Actions.HOST, name }));
   }; 
 
   return (
-    <form method='POST' onSubmit={handleSubmit}>
-      <input type='text' name='name' placeholder='Name'></input><br/>
-      <input type='submit' value='Enter' disabled={!socket}></input><br/>
-      <p style={{color: 'tomato'}}>{errMsg}</p>
-    </form>    
+    <BSForm method='POST' onSubmit={handleSubmit}>
+      <BSStack className='host' gap={4}>
+        <h1>Host</h1>
+        <input 
+          className='px-2'
+          type='text' 
+          name='name' 
+          placeholder='Enter nickname'
+          disabled={waiting}
+          required
+        />
+        <input 
+          ref={hostBtnRef}
+          type='submit' 
+          value="Let's go!" 
+          disabled={!socket || waiting}
+        />
+      </BSStack>
+    </BSForm>
   ); 
 }
 
 function Join() {
   const { socket, phase, errMsg }= useContext(GameContext); 
   const navigate = useNavigate(); 
+  const [waiting, setWaiting] = useState(false); 
+  const joinBtnRef = useRef(); 
 
   useEffect(() => {
     let ignore = false; 
-    if(!ignore && phase === Phases.WAITING) {
-      navigate('/lobby'); 
+    if(!ignore) {
+      if(phase === Phases.WAITING) {
+        setWaiting(false); 
+        navigate('/lobby'); 
+      } else if(errMsg) {
+        setWaiting(false); 
+        joinBtnRef.current.setCustomValidity(errMsg); 
+        joinBtnRef.current.reportValidity(); 
+      }
     }
     return () => ignore = true; 
-  }, [phase, navigate]); 
+  }, [phase, errMsg, navigate]); 
 
   const handleSubmit = (event) => {
     event.preventDefault(); 
+    setWaiting(true); 
     const formData = new FormData(event.target); 
     const { id, name } = Object.fromEntries(formData); 
     socket.send(JSON.stringify({ action: Actions.JOIN, id, name })); 
   };  
 
   return (
-    <form method='POST' onSubmit={handleSubmit}>
-      <input type='text' name='id' placeholder='Game ID'></input><br/>
-      <input type='text' name='name' placeholder='Name'></input><br/>
-      <input type='submit' value='Enter' disabled={!socket}></input><br/>
-      <p style={{color: 'tomato'}}>{errMsg}</p>
-    </form>
+    <BSForm method='POST' onSubmit={handleSubmit}>
+      <BSStack className='join' gap={4}>
+        <h1>Join</h1>
+        <input 
+          className='px-2'
+          type='text' 
+          name='id' 
+          placeholder='Enter game id'
+          pattern='^[a-z0-9]{6}$'
+          disabled={waiting}
+          required
+        />
+        <input 
+          className='px-2'
+          type='text' 
+          name='name' 
+          placeholder='Enter nickname'
+          disabled={waiting}
+          required
+        />
+        <input 
+          ref={joinBtnRef}
+          type='submit' 
+          value="Let's go!" 
+          disabled={!socket || waiting}
+        />
+      </BSStack>
+    </BSForm>
+  ); 
+}
+
+function Floor({ players }) {
+  return (
+    <div className='floor p-2 rounded'>
+      <ul className='p-0 m-0'>
+        {players.map(name => <li key={name} className='m-2'>{name}</li>)}
+      </ul>
+    </div>
   ); 
 }
 
 function Lobby({ id, players, isHost }) {
-  const { socket, phase, errMsg }= useContext(GameContext); 
+  const { socket, phase } = useContext(GameContext); 
   const navigate = useNavigate(); 
-  const [started, setStarted] = useState(false); 
 
   useEffect(() => {
     let ignore = false; 
     if(!ignore) {
       switch(phase) {
-        case Phases.IDLEING: 
+        case Phases.IDLEING:
           navigate('/'); 
-          break; 
+          break;
         case Phases.STARTING:
           socket.send(JSON.stringify({ action: Actions.READY })); 
           break; 
         case Phases.PLAYING:
           navigate('/play'); 
-          break; 
+          break;
         default:
       }
     }
@@ -233,7 +363,6 @@ function Lobby({ id, players, isHost }) {
   }, [socket, phase, navigate]); 
 
   const handleStart = () => {
-    setStarted(true); 
     socket.send(JSON.stringify({ action: Actions.START })); 
   }; 
 
@@ -242,13 +371,12 @@ function Lobby({ id, players, isHost }) {
   }; 
 
   return (
-    <div>
-      <p>{id}</p>
-      <ul>{players.map(name => <li key={name}>{name}</li>)}</ul>
-      <button onClick={handleStart} disabled={!isHost || !socket || started}>Start</button><br/>
-      <button onClick={handleLeave} disabled={!socket}>Leave</button><br/>
-      <p style={{color: 'tomato'}}>{errMsg}</p>
-    </div>
+    <BSStack className='lobby' gap={4}>
+      <h1>{id}</h1>
+      <Floor players={players}/>
+      <button onClick={handleStart} disabled={!socket || !isHost}>Start</button>
+      <button onClick={handleLeave} disabled={!socket}>Leave</button>
+    </BSStack>
   ); 
 }
 
