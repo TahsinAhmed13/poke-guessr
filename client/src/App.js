@@ -2,8 +2,8 @@ import {
   createContext,
   useContext,
   useState,
-  useEffect,
   useRef,
+  useEffect,
 } from 'react';
 import {
   createBrowserRouter,
@@ -11,7 +11,8 @@ import {
   RouterProvider,
   useNavigate,
 } from 'react-router-dom'; 
-import logo from './logo.png'
+import logo from './assets/logo.png'; 
+import frame from './assets/frame.png'; 
 import './App.css'; 
 import { Actions } from './protocol'; 
 
@@ -43,6 +44,7 @@ export default function App() {
   /* PLAYING PHASE */
   const [choices, setChoices] = useState([]); 
   const [dataUrl, setDataUrl] = useState(''); 
+  const [pixelation, setPixelation] = useState(1); 
   const [count, setCount] = useState(0); 
 
   const router = createBrowserRouter([
@@ -88,12 +90,18 @@ export default function App() {
     },
     {
       path: '/play',
-      element: <Play
-        choices={choices}
-        dataUrl={dataUrl}
-        count={count}
-        leaderboard={leaderboard}
-      />
+      element: (
+        <>
+          <Navbar/>
+          <Play
+            leaderboard={leaderboard}
+            choices={choices}
+            dataUrl={dataUrl}
+            pixelation={pixelation}
+            count={count}
+          />
+        </>
+      ),
     },
   ]);
 
@@ -139,6 +147,7 @@ export default function App() {
             setPhase(Phases.PLAYING); 
             setChoices(res.choices); 
             setDataUrl(res.dataUrl); 
+            setPixelation(res.pixelation); 
             setCount(0); 
             break; 
           case Actions.ANSWER:
@@ -205,7 +214,7 @@ function Home() {
   const navigate = useNavigate(); 
 
   return (
-    <BSStack className='home' gap={4}>
+    <BSStack className='home page' gap={4}>
       <BSStack className='home-titles' gap={1}>
         <h1>PokéGuessr</h1>
         <h2>Shiny Edition</h2>
@@ -247,7 +256,7 @@ function Host() {
 
   return (
     <BSForm method='POST' onSubmit={handleSubmit}>
-      <BSStack className='host' gap={4}>
+      <BSStack className='host page' gap={4}>
         <h1>Host</h1>
         <input 
           className='px-2'
@@ -299,7 +308,7 @@ function Join() {
 
   return (
     <BSForm method='POST' onSubmit={handleSubmit}>
-      <BSStack className='join' gap={4}>
+      <BSStack className='join page' gap={4}>
         <h1>Join</h1>
         <input 
           className='px-2'
@@ -371,7 +380,7 @@ function Lobby({ id, players, isHost }) {
   }; 
 
   return (
-    <BSStack className='lobby' gap={4}>
+    <BSStack className='lobby page' gap={4}>
       <h1>{id}</h1>
       <Floor players={players}/>
       <button onClick={handleStart} disabled={!socket || !isHost}>Start</button>
@@ -399,48 +408,6 @@ function Play({ leaderboard, ...roundProps }) {
   ); 
 }
 
-function Round({ choices, dataUrl, count }) {
-  const size = 256; 
-  const { socket, errMsg } = useContext(GameContext); 
-  const canvasRef = useRef(null); 
-  const [choice, setChoice] = useState(0); 
-
-  useEffect(() => {
-    const img = new Image(); 
-    const handleImageLoad = () => {
-      const canvas = canvasRef.current; 
-      const context = canvas.getContext('2d', { willReadFrequently: true }); 
-      context.drawImage(img, 0, 0, size, size); 
-    };
-    img.src = dataUrl; 
-    img.addEventListener('load', handleImageLoad); 
-    return () => img.removeEventListener('load', handleImageLoad); 
-  }, [dataUrl]); 
-
-  const handleRespond = (choice) => {
-    socket.send(JSON.stringify({ action: Actions.RESPOND, choice })); 
-    setChoice(choice); 
-  }; 
-
-  return (
-    <div>
-      <canvas width={size} height={size} ref={canvasRef}>
-      </canvas>
-      <div>
-        {choices.map((species, index) => 
-          <div key={species}>
-            <button onClick={handleRespond.bind(null, index+1)} disabled={!socket || choice}>
-              {species}
-            </button>
-          </div>
-        )}
-      </div>
-      <p>{count}</p>
-      <p style={{color: 'tomato'}}>{errMsg}</p>
-    </div>
-  );
-}
-
 function Leaderboard({ leaderboard }) {
   const { socket, errMsg } = useContext(GameContext); 
   const [ready, setReady] = useState(false); 
@@ -461,4 +428,83 @@ function Leaderboard({ leaderboard }) {
       <p style={{color: 'tomato'}}>{errMsg}</p>
     </div>
   ); 
+}
+
+function Round({ choices, dataUrl, pixelation, count }) {
+  const { socket } = useContext(GameContext); 
+  const frameRef = useRef(null);
+  const bufCanvasRef = useRef(null); 
+  const drawCanvasRef = useRef(null); 
+  const [choice, setChoice] = useState(0); 
+
+  useEffect(() => {
+    const origScreenRect = { x: 63, y: 69, width: 1040, height: 546 }; 
+    const frame = frameRef.current; 
+    const img = new Image(); 
+    
+    const handleImageLoad = () => {
+      const drawCanvas = drawCanvasRef.current;
+      const drawCtx = drawCanvas.getContext('2d', { willReadFrequently: true }); 
+      const size = drawCanvas.width; 
+      drawCtx.clearRect(0, 0, size, size); 
+      drawCtx.drawImage(img, 0, 0, size, size); 
+    };
+
+    const handleFrameResize = () => {
+      const origFrameRect = { 
+        x: 0, y: 0, 
+        width: frame.naturalWidth, 
+        height: frame.naturalHeight
+      }; 
+      const frameRect = frame.getBoundingClientRect(); 
+      const scale = frameRect.height / origFrameRect.height;  
+      const height = origScreenRect.height * scale; 
+      const top = origScreenRect.y * scale; 
+      bufCanvasRef.current.width = height; 
+      bufCanvasRef.current.height = height; 
+      drawCanvasRef.current.width = height; 
+      drawCanvasRef.current.height = height; 
+      drawCanvasRef.current.style.top = `${top}px`;  
+      img.removeEventListener('load', handleImageLoad); 
+      img.src = dataUrl; 
+      img.addEventListener('load', handleImageLoad); 
+    }
+    
+    const handleFrameLoad = () => {
+      handleFrameResize(); 
+      window.addEventListener('resize', handleFrameResize); 
+    }
+
+    if(frame.complete) {
+      handleFrameLoad(); 
+    } else {
+      frame.addEventListener('load', handleFrameLoad); 
+    }
+    return () => {
+      img.removeEventListener('load', handleImageLoad); 
+      window.removeEventListener('resize', handleFrameResize); 
+      frame.removeEventListener('load', handleFrameLoad); 
+    }; 
+  }, [dataUrl]); 
+
+  const handleRespond = (choice) => {
+    setChoice(choice); 
+    socket.send(JSON.stringify({ action: Actions.RESPOND, choice })); 
+  }; 
+
+  return (
+    <BSStack className='round page' gap={4}>
+      <img ref={frameRef} alt='frame' src={frame} className='frame'/>
+      <canvas ref={bufCanvasRef} className='buffer-canvas'></canvas>
+      <canvas ref={drawCanvasRef} className='draw-canvas'></canvas>
+      <BSStack className='round-choices mx-auto' gap={4}>
+        {choices.map((species, index) => 
+          <button 
+            onClick={handleRespond.bind(null, index+1)} 
+            disabled={!socket || choice}
+          >{species}</button>
+        )}
+      </BSStack>
+    </BSStack>
+  );
 }

@@ -82,3 +82,12 @@
     <img alt="07_23_23_03" src="scrots/changelog/07_23_23_03.PNG" width="250"/>
     <img alt="07_23_23_04" src="scrots/changelog/07_23_23_04.PNG" width="250"/>
 </div>
+
+# 2023-07-25
+
+* client
+    * add pokedex frame to round page
+    * overlay canvas on frame and synchronize drawing
+    * rework button layout
+
+<img alt="07_25_23" src="scrots/changelog/07_25_23.PNG" width="250"/>
