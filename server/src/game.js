@@ -46,11 +46,11 @@ class Round {
     this.choices = choices; 
     this.answer = answer; 
     this.dataUrl = dataUrl; 
-    this.pixelation = Math.max(1, pixelation); 
+    this.pixelation = pixelation; 
     this.players = players; 
   }
 
-  ready(timeout = Infinity) {
+  ready() {
     return new Promise((resolve) => {
       const responses = new Set(); 
       const callbacks = new Map(); 
@@ -96,13 +96,10 @@ class Round {
       this.players.forEach(({ socket }) => 
         socket.send(JSON.stringify({ action: Actions.STARTED })) 
       ); 
-      if(timeout != Infinity) {
-        setTimeout(cleanup, timeout); 
-      }
     }); 
   }
 
-  run(timeout = Infinity) {
+  run(delay = 3, timeout = -1) {
     return new Promise((resolve) => {
       const results = new Map(); 
       const callbacks = new Map(); 
@@ -171,10 +168,11 @@ class Round {
           action: Actions.QUESTION,
           choices: this.choices,
           dataUrl: this.dataUrl,
-          pixelation: this.pixelation
+          pixelation: this.pixelation,
+          delay, timeout,
         }));
       });
-      if(timeout != Infinity) {
+      if(timeout >= 0) {
         setTimeout(cleanup, timeout); 
       }
     }); 
@@ -187,8 +185,9 @@ class Game {
       gen = 0,
       rounds = 10,
       count = 4,
-      pixelation = 1,
-      timeouts = {}
+      pixelation = 1/256,
+      delay = 3,
+      timeout = -1,
     } = options; 
     this.game_reg = game_reg; 
     this.id = id; 
@@ -198,12 +197,9 @@ class Game {
     this.picker = new PokePicker(gen); 
     this.rounds = rounds; 
     this.count = count; 
-    this.pixelation = Math.max(1, pixelation); 
-    this.timeouts = {
-      ready: Infinity,
-      run: Infinity,
-      ...timeouts
-    }
+    this.pixelation = pixelation; 
+    this.delay = delay; 
+    this.timeout = timeout; 
     hostws.on('message', async (msg) => {
       try {
         const { action = Actions.NONE } = JSON.parse(msg); 
@@ -361,8 +357,8 @@ class Game {
       const species = choices[answer-1].toLowerCase().replace(' ', '-'); 
       const dataUrl = await this.game_reg.ips.getDataUrl(species); 
       const round = new Round(choices, answer, dataUrl, this.pixelation, this.players); 
-      await round.ready(this.timeouts.ready); 
-      await round.run(this.timeouts.run); 
+      await round.ready(); 
+      await round.run(this.delay, this.timeout); 
     } 
     this.players.forEach(({ socket, request }) => {
       socket.send(JSON.stringify({

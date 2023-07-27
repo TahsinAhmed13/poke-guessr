@@ -91,3 +91,9 @@
     * rework button layout
 
 <img alt="07_25_23" src="scrots/changelog/07_25_23.PNG" width="250"/>
+
+# 2023-07-26
+
+* client
+    * add a countdown before each round
+    * add pixelation to images

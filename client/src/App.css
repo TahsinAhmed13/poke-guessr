@@ -141,6 +141,13 @@ input[type="text"] {
   width: 90%; 
 }
 
+.countdown {
+  position: relative;
+  font-size: 102px; 
+  text-align: center;
+  top: 40vh; 
+}
+
 /* sm */
 @media (min-width: 576px) {
   .floor {

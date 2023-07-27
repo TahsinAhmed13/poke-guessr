@@ -44,7 +44,9 @@ export default function App() {
   /* PLAYING PHASE */
   const [choices, setChoices] = useState([]); 
   const [dataUrl, setDataUrl] = useState(''); 
-  const [pixelation, setPixelation] = useState(1); 
+  const [pixelation, setPixelation] = useState(1/256); 
+  const [delay, setDelay] = useState(3); 
+  const [timeout, setTimeout] = useState(-1); 
   const [count, setCount] = useState(0); 
 
   const router = createBrowserRouter([
@@ -98,6 +100,8 @@ export default function App() {
             choices={choices}
             dataUrl={dataUrl}
             pixelation={pixelation}
+            delay={delay}
+            timeout={timeout}
             count={count}
           />
         </>
@@ -148,6 +152,8 @@ export default function App() {
             setChoices(res.choices); 
             setDataUrl(res.dataUrl); 
             setPixelation(res.pixelation); 
+            setDelay(res.delay); 
+            setTimeout(res.timeout); 
             setCount(0); 
             break; 
           case Actions.ANSWER:
@@ -251,7 +257,7 @@ function Host() {
     setWaiting(true); 
     const formData = new FormData(event.target); 
     const { name } = Object.fromEntries(formData); 
-    socket.send(JSON.stringify({ action: Actions.HOST, name }));
+    socket.send(JSON.stringify({ action: Actions.HOST, name, options: {pixelation: 0.08} }));
   }; 
 
   return (
@@ -430,24 +436,83 @@ function Leaderboard({ leaderboard }) {
   ); 
 }
 
-function Round({ choices, dataUrl, pixelation, count }) {
+function useCountdown(delay) {
+  delay = Math.max(0, delay); 
+  const [countdown, setCountdown] = useState(delay); 
+  useEffect(() => {
+    let countdown = delay; 
+    const intervalId = setInterval(() => {
+      if(countdown) {
+        setCountdown(--countdown); 
+      } else {
+        clearInterval(intervalId);  
+      }
+    }, 1000);
+  }, [delay]); 
+  return countdown; 
+}
+
+function getAverageColor(data, channels) {
+  const pixels = data.length / channels; 
+  const color = new Array(channels).fill(0);  
+  for(let i = 0; i < data.length; i += channels) {
+    for(let j = 0; j < channels; ++j) {
+      color[j] += data[i+j]*data[i+j]; 
+    }
+  }
+  for(let i = 0; i < channels; ++i) {
+    color[i] = Math.round(Math.sqrt(color[i] / pixels)); 
+  }
+  return new Uint8ClampedArray(color); 
+}
+
+function pixelate(dest, src, step) {
+  const channels = 4; 
+  const destCtx = dest.getContext('2d', { willReadFrequently: true }); 
+  const srcCtx = src.getContext('2d', { willReadFrequently: true }); 
+  const pixelArray = destCtx.createImageData(src.width, src.height); 
+  for(let i = 0; i < src.height; i += step) {
+    for(let j = 0; j < src.width; j += step) {
+      const imgData = srcCtx.getImageData(j, i, step, step); 
+      const color = getAverageColor(imgData.data, channels); 
+      for(let y = i; y < i+step; ++y) {
+        for(let x = j; x < j+step; ++x) {
+          const start = channels*(y*src.width+x); 
+          for(let k = 0; k < channels; ++k) {
+            pixelArray.data[start+k] = color[k]; 
+          }
+        }
+      } 
+    }
+  }   
+  destCtx.clearRect(0, 0, destCtx.width, destCtx.height); 
+  destCtx.putImageData(pixelArray, 0, 0); 
+}
+
+function Round({ choices, dataUrl, pixelation, delay, timeout, count }) {
   const { socket } = useContext(GameContext); 
   const frameRef = useRef(null);
   const bufCanvasRef = useRef(null); 
   const drawCanvasRef = useRef(null); 
   const [choice, setChoice] = useState(0); 
+  const countdown = useCountdown(delay); 
 
   useEffect(() => {
+    if(countdown) {
+      return () => {}; 
+    }
     const origScreenRect = { x: 63, y: 69, width: 1040, height: 546 }; 
     const frame = frameRef.current; 
     const img = new Image(); 
     
     const handleImageLoad = () => {
-      const drawCanvas = drawCanvasRef.current;
-      const drawCtx = drawCanvas.getContext('2d', { willReadFrequently: true }); 
-      const size = drawCanvas.width; 
-      drawCtx.clearRect(0, 0, size, size); 
-      drawCtx.drawImage(img, 0, 0, size, size); 
+      const bufCanvas = bufCanvasRef.current; 
+      const bufCtx = bufCanvas.getContext('2d', { willReadFrequently: true }); 
+      const drawCanvas = drawCanvasRef.current; 
+      const size = bufCanvas.width; 
+      bufCtx.clearRect(0, 0, size, size); 
+      bufCtx.drawImage(img, 0, 0, size, size); 
+      pixelate(drawCanvas, bufCanvas, Math.ceil(size*pixelation)); 
     };
 
     const handleFrameResize = () => {
@@ -485,7 +550,7 @@ function Round({ choices, dataUrl, pixelation, count }) {
       window.removeEventListener('resize', handleFrameResize); 
       frame.removeEventListener('load', handleFrameLoad); 
     }; 
-  }, [dataUrl]); 
+  }, [dataUrl, pixelation, countdown]); 
 
   const handleRespond = (choice) => {
     setChoice(choice); 
@@ -493,18 +558,21 @@ function Round({ choices, dataUrl, pixelation, count }) {
   }; 
 
   return (
-    <BSStack className='round page' gap={4}>
-      <img ref={frameRef} alt='frame' src={frame} className='frame'/>
-      <canvas ref={bufCanvasRef} className='buffer-canvas'></canvas>
-      <canvas ref={drawCanvasRef} className='draw-canvas'></canvas>
-      <BSStack className='round-choices mx-auto' gap={4}>
-        {choices.map((species, index) => 
-          <button 
-            onClick={handleRespond.bind(null, index+1)} 
-            disabled={!socket || choice}
-          >{species}</button>
-        )}
-      </BSStack>
-    </BSStack>
+    countdown
+      ? <h1 className='countdown'>{countdown}</h1>
+      : (<BSStack className='round page' gap={4}>
+          <img ref={frameRef} alt='frame' src={frame} className='frame'/>
+          <canvas ref={bufCanvasRef} className='buffer-canvas'></canvas>
+          <canvas ref={drawCanvasRef} className='draw-canvas'></canvas>
+          <BSStack className='round-choices mx-auto' gap={4}>
+            {choices.map((species, index) => 
+              <button 
+                key={species}
+                onClick={handleRespond.bind(null, index+1)} 
+                disabled={!socket || choice}
+              >{species}</button>
+            )}
+          </BSStack>
+        </BSStack>)
   );
 }
