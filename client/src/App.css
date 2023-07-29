@@ -2,40 +2,6 @@ body {
   background-color: #ee1515; 
 }
 
-h1, h2 {
-  text-shadow: 2px 5px 5px black;
-  color: #f0f0f0; 
-}
-
-h1 {
-  font-size: 64px; 
-}
-
-h2 {
-  font-size: 28px; 
-}
-
-button, 
-input[type="submit"] {
-  background-color: cornflowerblue;
-  outline: none; 
-  border: none; 
-  border-radius: 5px;
-  cursor: pointer;
-  box-shadow: 0 8px black;
-  max-width: 250px; 
-}
-
-button:enabled:hover, 
-input[type="submit"]:enabled:hover {
-  box-shadow: 0 3px black;
-  transform: translateY(5px);
-}
-
-input[type="text"] {
-  max-width: 475px; 
-}
-
 .navbar {
   background-color: #222224;
 }
@@ -53,7 +19,44 @@ input[type="text"] {
 .page {
   position: relative; 
   align-items: center;
+  text-align: center;
   font-size: 36px; 
+}
+
+.page h1, .page h2 {
+  text-shadow: 2px 5px 5px black;
+  color: #f0f0f0; 
+}
+
+.page h1 {
+  font-size: 64px; 
+}
+
+.page h2 {
+  font-size: 28px; 
+}
+
+.page button, 
+.page input[type="submit"] {
+  background-color: cornflowerblue;
+  outline: none; 
+  border: none; 
+  border-radius: 5px;
+  cursor: pointer;
+  box-shadow: 0 8px black;
+  width: 50%; 
+  max-width: 250px; 
+}
+
+.page button:enabled:hover, 
+.page input[type="submit"]:enabled:hover {
+  box-shadow: 0 3px black;
+  transform: translateY(5px);
+}
+
+.page input[type="text"] {
+  width: 80%; 
+  max-width: 475px; 
 }
 
 .home {
@@ -72,24 +75,20 @@ input[type="text"] {
   top: 10vh; 
 }
 
+.countdown {
+  top: 40vh; 
+}
+
 .round {
-  top: 12vh; 
+  top: 15vh; 
 }
 
-.home-titles {
-  align-items: center;
+.leaderboard {
+  top: 25vh; 
 }
 
-.home button,
-.host input[type="submit"],
-.join input[type="submit"],
-.lobby button {
-  width: 40%; 
-}
-
-.host input[type="text"],
-.join input[type="text"] {
-  width: 70%; 
+.footer {
+  height: 5vh; 
 }
 
 .floor {
@@ -101,22 +100,45 @@ input[type="text"] {
   overflow-y: auto; 
 }
 
-.floor ul {
+.floor-list {
   list-style-type: none;
   display: flex; 
   flex-wrap: wrap;
   justify-content: center;
+  padding: 0;
+  margin: 0; 
 }
 
-.floor li {
+.floor-list li {
   width: 40%; 
   text-align: center;
   overflow: hidden;
 }
 
+.leaderboard-list {
+  display: flex; 
+  flex-direction: column;  
+  align-items: stretch;
+  width: 90%; 
+  max-width: 340px; 
+  border: 1px solid black; 
+}
+
+.leaderboard-list li {
+  border: 1px solid black; 
+}
+
+.round button {
+  width: 90%; 
+}
+
 .frame {
   width: 90%; 
   max-width: 380px; 
+}
+
+.countdown h1 {
+  font-size: 102px;
 }
 
 .buffer-canvas, 
@@ -128,24 +150,19 @@ input[type="text"] {
   visibility: hidden;
 }
 
-.round-choices {
-  display: flex;
-  flex-direction: column; 
+.round-choices, .round-answer {
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
+  margin: auto; 
   width: 100%; 
 }
 
-.round-choices button {
-  width: 90%; 
-}
-
-.countdown {
-  position: relative;
-  font-size: 102px; 
-  text-align: center;
-  top: 40vh; 
+.timer {
+  position: fixed;
+  bottom: 0; 
+  height: 20px; 
+  background-color: teal;   
 }
 
 /* sm */
@@ -154,7 +171,7 @@ input[type="text"] {
     width: 75%; 
   }
 
-  .floor li {
+  .floor-list li {
     width: 35%; 
   }
 }
@@ -165,7 +182,7 @@ input[type="text"] {
     width: 70%; 
   }
 
-  .floor li {
+  .floor-list li {
     width: 30%; 
   }
 
@@ -181,7 +198,7 @@ input[type="text"] {
     width: 65%; 
   }
 
-  .floor li {
+  .floor-list li {
     width: 25%; 
   } 
 }
@@ -192,7 +209,7 @@ input[type="text"] {
     width: 60%; 
   }
 
-  .floor li { 
+  .floor-list li { 
     width: 20%;  
   }
 }

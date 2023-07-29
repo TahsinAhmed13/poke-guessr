@@ -99,7 +99,7 @@ class Round {
     }); 
   }
 
-  run(delay = 3, timeout = -1) {
+  run(delay, timeout) {
     return new Promise((resolve) => {
       const results = new Map(); 
       const callbacks = new Map(); 
@@ -112,7 +112,6 @@ class Round {
           socket.send(JSON.stringify({
             action: Actions.ANSWER,
             answer: this.answer,
-            correct: this.choices[this.answer-1] === results.get(name),
             leaderboard: Player.get_leaderboard(this.players)
           }));
         }); 
@@ -172,8 +171,8 @@ class Round {
           delay, timeout,
         }));
       });
-      if(timeout >= 0) {
-        setTimeout(cleanup, timeout); 
+      if(timeout) {
+        setTimeout(cleanup, delay+timeout); 
       }
     }); 
   }
@@ -185,9 +184,9 @@ class Game {
       gen = 0,
       rounds = 10,
       count = 4,
-      pixelation = 1/256,
-      delay = 3,
-      timeout = -1,
+      pixelation = 0,
+      delay = 3000,
+      timeout = 0,
     } = options; 
     this.game_reg = game_reg; 
     this.id = id; 
@@ -361,10 +360,7 @@ class Game {
       await round.run(this.delay, this.timeout); 
     } 
     this.players.forEach(({ socket, request }) => {
-      socket.send(JSON.stringify({
-        action: Actions.ENDED,
-        leaderboard: Player.get_leaderboard(this.players)
-      }));
+      socket.send(JSON.stringify({ action: Actions.ENDED }));
       this.game_reg.wss.emit('connection', socket, request); 
     }); 
     this.players.clear();  

@@ -97,3 +97,11 @@
 * client
     * add a countdown before each round
     * add pixelation to images
+
+# 2023-07-28
+
+* client
+    * add countdown timer bar
+    * add de-pixelation reveal animation
+
+<img alt="07_28_23" src="scrots/changelog/07_28_23.PNG" width="250"/>

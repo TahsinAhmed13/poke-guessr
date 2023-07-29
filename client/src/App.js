@@ -39,8 +39,6 @@ export default function App() {
   const [id, setId] = useState(''); 
   const [players, setPlayers] = useState([]); 
   const [isHost, setIsHost] = useState(false); 
-  /* STARTING PHASE */
-  const [leaderboard, setLeaderboard] = useState([]); 
   /* PLAYING PHASE */
   const [choices, setChoices] = useState([]); 
   const [dataUrl, setDataUrl] = useState(''); 
@@ -48,6 +46,11 @@ export default function App() {
   const [delay, setDelay] = useState(3); 
   const [timeout, setTimeout] = useState(-1); 
   const [count, setCount] = useState(0); 
+  const [answer, setAnswer] = useState(0); 
+  const [leaderboard, setLeaderboard] = useState([]); 
+  /* CONSTANTS */
+  const revealTime = 3000; 
+  const revealInterval = 500; 
 
   const router = createBrowserRouter([
     {
@@ -103,6 +106,7 @@ export default function App() {
             delay={delay}
             timeout={timeout}
             count={count}
+            answer={answer}
           />
         </>
       ),
@@ -112,6 +116,7 @@ export default function App() {
   useEffect(() => {
     const ws = new WebSocket('ws://localhost:8000'); 
     ws.onopen = () => {
+      let pixelation = 0; 
       ws.addEventListener('message', ({ data }) => {
         const res = JSON.parse(data); 
         setErrMsg(''); 
@@ -144,9 +149,6 @@ export default function App() {
             setPlayers([]); 
             setIsHost(false); 
             break; 
-          case Actions.RESPONDED:
-            setCount(res.count); 
-            break; 
           case Actions.QUESTION:
             setPhase(Phases.PLAYING); 
             setChoices(res.choices); 
@@ -155,9 +157,23 @@ export default function App() {
             setDelay(res.delay); 
             setTimeout(res.timeout); 
             setCount(0); 
+            setAnswer(0); 
+            pixelation = res.pixelation; 
+            break; 
+          case Actions.RESPONDED:
+            setCount(res.count); 
             break; 
           case Actions.ANSWER:
+            setAnswer(res.answer); 
             setLeaderboard(res.leaderboard); 
+            const delta = pixelation / (revealTime / revealInterval); 
+            const intervalId = setInterval(() => {
+              pixelation = Math.max(0, pixelation-delta); 
+              setPixelation(pixelation); 
+              if(!pixelation) {
+                clearInterval(intervalId); 
+              }
+            }, revealInterval); 
             break; 
           case Actions.ENDED:
             setPhase(Phases.IDLEING); 
@@ -227,6 +243,7 @@ function Home() {
       </BSStack>
       <button onClick={() => navigate('/host')}>Host</button>
       <button onClick={() => navigate('/join')}>Join</button>
+      <div className='footer'></div>
     </BSStack>
   ); 
 }
@@ -257,7 +274,8 @@ function Host() {
     setWaiting(true); 
     const formData = new FormData(event.target); 
     const { name } = Object.fromEntries(formData); 
-    socket.send(JSON.stringify({ action: Actions.HOST, name, options: {pixelation: 0.08} }));
+    socket.send(JSON.stringify({ action: Actions.HOST, name, 
+      options: {pixelation: 0.08, timeout: 10000} }));
   }; 
 
   return (
@@ -278,6 +296,7 @@ function Host() {
           value="Let's go!" 
           disabled={!socket || waiting}
         />
+        <div className='footer'></div>
       </BSStack>
     </BSForm>
   ); 
@@ -339,6 +358,7 @@ function Join() {
           value="Let's go!" 
           disabled={!socket || waiting}
         />
+        <div className='footer'></div>
       </BSStack>
     </BSForm>
   ); 
@@ -347,7 +367,7 @@ function Join() {
 function Floor({ players }) {
   return (
     <div className='floor p-2 rounded'>
-      <ul className='p-0 m-0'>
+      <ul className='floor-list'>
         {players.map(name => <li key={name} className='m-2'>{name}</li>)}
       </ul>
     </div>
@@ -391,6 +411,7 @@ function Lobby({ id, players, isHost }) {
       <Floor players={players}/>
       <button onClick={handleStart} disabled={!socket || !isHost}>Start</button>
       <button onClick={handleLeave} disabled={!socket}>Leave</button>
+      <div className='footer'></div>
     </BSStack>
   ); 
 }
@@ -398,57 +419,63 @@ function Lobby({ id, players, isHost }) {
 function Play({ leaderboard, ...roundProps }) {
   const { phase } = useContext(GameContext); 
   const navigate = useNavigate(); 
+  const [done, setDone] = useState(false); 
 
   useEffect(() => {
     let ignore = false; 
-    if(!ignore && phase === Phases.IDLEING) {
-      navigate('/'); 
+    if(!ignore) {
+      switch(phase) {
+        case Phases.IDLEING:
+          navigate('/'); 
+          break; 
+        default:
+      }
     }
     return () => ignore = true; 
   }, [phase, navigate]); 
 
   return (
-    phase === Phases.STARTING
-      ? <Leaderboard leaderboard={leaderboard}/>
-      : <Round {...roundProps}/>
+    done
+      ? <Leaderboard setDone={setDone} leaderboard={leaderboard}/>
+      : <Round setDone={setDone} {...roundProps}/>
   ); 
 }
 
-function Leaderboard({ leaderboard }) {
-  const { socket, errMsg } = useContext(GameContext); 
+function Leaderboard({ setDone, leaderboard }) {
+  const { socket } = useContext(GameContext); 
   const [ready, setReady] = useState(false); 
   
   const handleReady = () => {
     socket.send(JSON.stringify({ action: Actions.READY })); 
+    setDone(false); 
     setReady(true); 
   }; 
 
   return (
-    <div>
-      <ol>
+    <BSStack className='leaderboard page'>
+      <ol className='leaderboard-list'>
         {leaderboard.map(({ name, score, streak }) => 
           <li key={name}>{`${name}\t${score}\t${streak}`}</li> 
         )}
       </ol>
       <button onClick={handleReady} disabled={!socket || ready}>Ready</button> 
-      <p style={{color: 'tomato'}}>{errMsg}</p>
-    </div>
+    </BSStack>
   ); 
 }
 
-function useCountdown(delay) {
+function useCountdown(delay, interval = 1000) {
   delay = Math.max(0, delay); 
   const [countdown, setCountdown] = useState(delay); 
   useEffect(() => {
     let countdown = delay; 
     const intervalId = setInterval(() => {
-      if(countdown) {
-        setCountdown(--countdown); 
-      } else {
+      countdown = Math.max(0, countdown-interval); 
+      setCountdown(countdown); 
+      if(!countdown) {
         clearInterval(intervalId);  
       }
-    }, 1000);
-  }, [delay]); 
+    }, interval);
+  }, [delay, interval]); 
   return countdown; 
 }
 
@@ -467,6 +494,7 @@ function getAverageColor(data, channels) {
 }
 
 function pixelate(dest, src, step) {
+  step = Math.max(1, step); 
   const channels = 4; 
   const destCtx = dest.getContext('2d', { willReadFrequently: true }); 
   const srcCtx = src.getContext('2d', { willReadFrequently: true }); 
@@ -475,8 +503,8 @@ function pixelate(dest, src, step) {
     for(let j = 0; j < src.width; j += step) {
       const imgData = srcCtx.getImageData(j, i, step, step); 
       const color = getAverageColor(imgData.data, channels); 
-      for(let y = i; y < i+step; ++y) {
-        for(let x = j; x < j+step; ++x) {
+      for(let y = i; y < i+step && y < src.height; ++y) {
+        for(let x = j; x < j+step && x < src.width; ++x) {
           const start = channels*(y*src.width+x); 
           for(let k = 0; k < channels; ++k) {
             pixelArray.data[start+k] = color[k]; 
@@ -489,13 +517,16 @@ function pixelate(dest, src, step) {
   destCtx.putImageData(pixelArray, 0, 0); 
 }
 
-function Round({ choices, dataUrl, pixelation, delay, timeout, count }) {
+function Round({ setDone, choices, dataUrl, pixelation, delay, timeout, count, answer }) {
   const { socket } = useContext(GameContext); 
   const frameRef = useRef(null);
   const bufCanvasRef = useRef(null); 
   const drawCanvasRef = useRef(null); 
   const [choice, setChoice] = useState(0); 
   const countdown = useCountdown(delay); 
+  const timer = useCountdown(delay+timeout, 10); 
+  const timerWidth = (timeout && !answer) 
+    ? `${Math.min(1,timer/timeout)*100}%` : 0; 
 
   useEffect(() => {
     if(countdown) {
@@ -509,9 +540,11 @@ function Round({ choices, dataUrl, pixelation, delay, timeout, count }) {
       const bufCanvas = bufCanvasRef.current; 
       const bufCtx = bufCanvas.getContext('2d', { willReadFrequently: true }); 
       const drawCanvas = drawCanvasRef.current; 
-      const size = bufCanvas.width; 
-      bufCtx.clearRect(0, 0, size, size); 
-      bufCtx.drawImage(img, 0, 0, size, size); 
+      const size = bufCanvas.height; 
+      const sx = (bufCanvas.width - size) / 2; 
+      bufCtx.fillStyle = 'white'; 
+      bufCtx.fillRect(0, 0, bufCanvas.width, bufCanvas.height); 
+      bufCtx.drawImage(img, sx, 0, size, size); 
       pixelate(drawCanvas, bufCanvas, Math.ceil(size*pixelation)); 
     };
 
@@ -522,12 +555,13 @@ function Round({ choices, dataUrl, pixelation, delay, timeout, count }) {
         height: frame.naturalHeight
       }; 
       const frameRect = frame.getBoundingClientRect(); 
-      const scale = frameRect.height / origFrameRect.height;  
+      const scale = frameRect.width / origFrameRect.width;  
+      const width = origScreenRect.width * scale; 
       const height = origScreenRect.height * scale; 
       const top = origScreenRect.y * scale; 
-      bufCanvasRef.current.width = height; 
+      bufCanvasRef.current.width = width; 
       bufCanvasRef.current.height = height; 
-      drawCanvasRef.current.width = height; 
+      drawCanvasRef.current.width = width; 
       drawCanvasRef.current.height = height; 
       drawCanvasRef.current.style.top = `${top}px`;  
       img.removeEventListener('load', handleImageLoad); 
@@ -559,20 +593,32 @@ function Round({ choices, dataUrl, pixelation, delay, timeout, count }) {
 
   return (
     countdown
-      ? <h1 className='countdown'>{countdown}</h1>
-      : (<BSStack className='round page' gap={4}>
-          <img ref={frameRef} alt='frame' src={frame} className='frame'/>
-          <canvas ref={bufCanvasRef} className='buffer-canvas'></canvas>
-          <canvas ref={drawCanvasRef} className='draw-canvas'></canvas>
-          <BSStack className='round-choices mx-auto' gap={4}>
-            {choices.map((species, index) => 
-              <button 
-                key={species}
-                onClick={handleRespond.bind(null, index+1)} 
-                disabled={!socket || choice}
-              >{species}</button>
-            )}
+      ? (<BSStack className='countdown page'>
+            <h1>{Math.floor(countdown/1000)}</h1>
+          </BSStack>)
+      : (<>
+          <BSStack className='round page' gap={3}>
+            <img ref={frameRef} alt='frame' src={frame} className='frame'/>
+            <canvas ref={bufCanvasRef} className='buffer-canvas'></canvas>
+            <canvas ref={drawCanvasRef} className='draw-canvas'></canvas>
+            {pixelation
+              ? (<BSStack className='round-choices' gap={4}>
+                  {choices.map((species, index) => 
+                    <button 
+                      key={species}
+                      onClick={handleRespond.bind(null, index+1)} 
+                      disabled={!socket || choice || (timeout && !timer)}
+                    >{species}</button>
+                  )}
+                </BSStack>)
+              : (<BSStack className='round-answer' gap={4}>
+                  <h1>{choices[answer-1]}</h1>
+                  <button onClick={() => setDone(true)}>Ok, got it!</button>
+                </BSStack>)
+            }
+            <div className='footer'></div>
           </BSStack>
-        </BSStack>)
+          <div className='timer' style={{width: timerWidth}}></div>
+        </>)
   );
 }
