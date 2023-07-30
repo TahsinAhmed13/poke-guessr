@@ -105,3 +105,11 @@
     * add de-pixelation reveal animation
 
 <img alt="07_28_23" src="scrots/changelog/07_28_23.PNG" width="250"/>
+
+# 2023-07-29
+
+* client
+    * add leaderboard page
+    * add confirmation dialogs
+
+<img alt="07_29_23" src="scrots/changelog/07_29_23.PNG" width="250">

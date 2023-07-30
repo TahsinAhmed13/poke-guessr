@@ -103,19 +103,23 @@ class Round {
     return new Promise((resolve) => {
       const results = new Map(); 
       const callbacks = new Map(); 
+      let done = false; 
       const cleanup = () => {
-        this.players.forEach(({ socket }, name) => {
-          socket.removeEventListener('message', callbacks[name].onmessage); 
-          socket.removeEventListener('close', callbacks[name].onclose); 
-        }); 
-        this.players.forEach(({ socket }, name) => {
-          socket.send(JSON.stringify({
-            action: Actions.ANSWER,
-            answer: this.answer,
-            leaderboard: Player.get_leaderboard(this.players)
-          }));
-        }); 
-        resolve(results); 
+        if(!done) {
+          done = true; 
+          this.players.forEach(({ socket }, name) => {
+            socket.removeEventListener('message', callbacks[name].onmessage); 
+            socket.removeEventListener('close', callbacks[name].onclose); 
+          }); 
+          this.players.forEach(({ socket }) => {
+            socket.send(JSON.stringify({
+              action: Actions.ANSWER,
+              answer: this.answer,
+              leaderboard: Player.get_leaderboard(this.players)
+            }));
+          }); 
+          resolve(results);
+        } 
       }
       for(const [ name, player ] of this.players.entries()) {
         callbacks[name] = {

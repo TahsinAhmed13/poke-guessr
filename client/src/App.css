@@ -29,7 +29,7 @@ body {
 }
 
 .page h1 {
-  font-size: 64px; 
+  font-size: 62px; 
 }
 
 .page h2 {
@@ -84,7 +84,7 @@ body {
 }
 
 .leaderboard {
-  top: 25vh; 
+  top: 10vh; 
 }
 
 .footer {
@@ -115,16 +115,23 @@ body {
   overflow: hidden;
 }
 
-.leaderboard-list {
-  display: flex; 
-  flex-direction: column;  
-  align-items: stretch;
+.leaderboard-list-container {
+  justify-content: start;
+  align-items: center;
+  margin: auto; 
   width: 90%; 
-  max-width: 340px; 
-  border: 1px solid black; 
+  max-width: 420px; 
+  max-height: 55vh; 
+  overflow: auto;
 }
 
-.leaderboard-list li {
+.leaderboard-list {
+  width: 100%; 
+  background-color: coral !important;  
+  border: 2px solid black; 
+}
+
+.leaderboard-list tr {
   border: 1px solid black; 
 }
 

@@ -27,6 +27,7 @@ const Phases = Object.freeze({
   STARTING: Symbol('STARTING'),
   PLAYING: Symbol('PLAYING'), 
 }); 
+const leaveMessage = 'Are you sure you want to leave this game?'; 
 
 const GameContext = createContext();  
 
@@ -50,7 +51,7 @@ export default function App() {
   const [leaderboard, setLeaderboard] = useState([]); 
   /* CONSTANTS */
   const revealTime = 3000; 
-  const revealInterval = 500; 
+  const revealRate = 500; 
 
   const router = createBrowserRouter([
     {
@@ -99,7 +100,6 @@ export default function App() {
         <>
           <Navbar/>
           <Play
-            leaderboard={leaderboard}
             choices={choices}
             dataUrl={dataUrl}
             pixelation={pixelation}
@@ -107,6 +107,7 @@ export default function App() {
             timeout={timeout}
             count={count}
             answer={answer}
+            leaderboard={leaderboard}
           />
         </>
       ),
@@ -166,14 +167,14 @@ export default function App() {
           case Actions.ANSWER:
             setAnswer(res.answer); 
             setLeaderboard(res.leaderboard); 
-            const delta = pixelation / (revealTime / revealInterval); 
+            const delta = pixelation / (revealTime / revealRate); 
             const intervalId = setInterval(() => {
               pixelation = Math.max(0, pixelation-delta); 
               setPixelation(pixelation); 
               if(!pixelation) {
                 clearInterval(intervalId); 
               }
-            }, revealInterval); 
+            }, revealRate); 
             break; 
           case Actions.ENDED:
             setPhase(Phases.IDLEING); 
@@ -191,6 +192,33 @@ export default function App() {
     setSocket(ws); 
     return () => ws.close();
   }, []); 
+  
+  useEffect(() => {
+    const handleBeforeUnload = (event) => {
+      event.preventDefault();  
+      event.returnValue = leaveMessage; 
+      return leaveMessage; 
+    }; 
+    if(id) {
+      window.addEventListener('beforeunload', handleBeforeUnload); 
+    }
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload); 
+  }, [id]); 
+
+  useEffect(() => {
+    const handlePopState = (event) => {
+      const confirmation = window.confirm(leaveMessage); 
+      if(confirmation) {
+        socket.send(JSON.stringify({ action: Actions.LEAVE })); 
+      } else {
+        event.preventDefault(); 
+      }
+    }
+    if(id) {
+      window.addEventListener('popstate', handlePopState); 
+    }
+    return () => window.removeEventListener('popstate', handlePopState); 
+  }, [socket, id]); 
 
   return (
     <GameContext.Provider value={{ socket, phase, errMsg }}>
@@ -202,9 +230,9 @@ export default function App() {
 function Navbar() {
   const { socket, phase } = useContext(GameContext); 
   
-  const confirmNavigation = (event) => {
+  const handleConfirmNavigation = (event) => {
     if(phase !== Phases.IDLEING) {
-      const confirmation = window.confirm('Are you sure you want to leave this game?'); 
+      const confirmation = window.confirm(leaveMessage); 
       if(confirmation) {
         socket.send(JSON.stringify({ action: Actions.LEAVE })); 
       } else {
@@ -216,16 +244,16 @@ function Navbar() {
   return (
     <BSNavbar fixed='top' className='navbar shadow'>
       <BSNavbar.Brand className='ms-3'>
-        <Link to='/' onClick={confirmNavigation}>
+        <Link to='/' onClick={handleConfirmNavigation}>
           <img src={logo} alt='Shiny Charm' width='30'/>
         </Link>
       </BSNavbar.Brand>
       <BSNav className='me-auto'>
-        <BSNav.Link>
-          <Link to='/host' onClick={confirmNavigation}>Host</Link>
+        <BSNav.Link href='/host'>
+          <Link to='/host' onClick={handleConfirmNavigation}>Host</Link>
         </BSNav.Link>
-        <BSNav.Link>
-          <Link to='/join' onClick={confirmNavigation}>Join</Link>
+        <BSNav.Link href='/join'>
+          <Link to='/join' onClick={handleConfirmNavigation}>Join</Link>
         </BSNav.Link>
       </BSNav>
     </BSNavbar>
@@ -383,7 +411,7 @@ function Lobby({ id, players, isHost }) {
     if(!ignore) {
       switch(phase) {
         case Phases.IDLEING:
-          navigate('/'); 
+          navigate('/', { replace: true }); 
           break;
         case Phases.STARTING:
           socket.send(JSON.stringify({ action: Actions.READY })); 
@@ -423,59 +451,36 @@ function Play({ leaderboard, ...roundProps }) {
 
   useEffect(() => {
     let ignore = false; 
-    if(!ignore) {
-      switch(phase) {
-        case Phases.IDLEING:
-          navigate('/'); 
-          break; 
-        default:
-      }
+    if(!ignore && phase === Phases.IDLEING) {
+      navigate('/', { replace: true }); 
     }
     return () => ignore = true; 
   }, [phase, navigate]); 
 
   return (
-    done
-      ? <Leaderboard setDone={setDone} leaderboard={leaderboard}/>
-      : <Round setDone={setDone} {...roundProps}/>
+    !done
+      ? <Round setDone={setDone} {...roundProps}/>
+      : <Leaderboard setDone={setDone} leaderboard={leaderboard}/>
   ); 
 }
 
-function Leaderboard({ setDone, leaderboard }) {
-  const { socket } = useContext(GameContext); 
-  const [ready, setReady] = useState(false); 
-  
-  const handleReady = () => {
-    socket.send(JSON.stringify({ action: Actions.READY })); 
-    setDone(false); 
-    setReady(true); 
-  }; 
-
-  return (
-    <BSStack className='leaderboard page'>
-      <ol className='leaderboard-list'>
-        {leaderboard.map(({ name, score, streak }) => 
-          <li key={name}>{`${name}\t${score}\t${streak}`}</li> 
-        )}
-      </ol>
-      <button onClick={handleReady} disabled={!socket || ready}>Ready</button> 
-    </BSStack>
-  ); 
-}
-
-function useCountdown(delay, interval = 1000) {
+function useCountdown(delay, rate = 10) {
   delay = Math.max(0, delay); 
   const [countdown, setCountdown] = useState(delay); 
   useEffect(() => {
     let countdown = delay; 
+    let before = new Date().getTime(); 
     const intervalId = setInterval(() => {
-      countdown = Math.max(0, countdown-interval); 
+      const now = new Date().getTime(); 
+      const delta = now - before; 
+      before = now; 
+      countdown = Math.max(0, countdown-delta); 
       setCountdown(countdown); 
       if(!countdown) {
         clearInterval(intervalId);  
       }
-    }, interval);
-  }, [delay, interval]); 
+    }, rate);
+  }, [delay, rate]); 
   return countdown; 
 }
 
@@ -524,7 +529,7 @@ function Round({ setDone, choices, dataUrl, pixelation, delay, timeout, count, a
   const drawCanvasRef = useRef(null); 
   const [choice, setChoice] = useState(0); 
   const countdown = useCountdown(delay); 
-  const timer = useCountdown(delay+timeout, 10); 
+  const timer = useCountdown(delay+timeout); 
   const timerWidth = (timeout && !answer) 
     ? `${Math.min(1,timer/timeout)*100}%` : 0; 
 
@@ -594,7 +599,7 @@ function Round({ setDone, choices, dataUrl, pixelation, delay, timeout, count, a
   return (
     countdown
       ? (<BSStack className='countdown page'>
-            <h1>{Math.floor(countdown/1000)}</h1>
+            <h1>{Math.ceil(countdown/1000)}</h1>
           </BSStack>)
       : (<>
           <BSStack className='round page' gap={3}>
@@ -621,4 +626,58 @@ function Round({ setDone, choices, dataUrl, pixelation, delay, timeout, count, a
           <div className='timer' style={{width: timerWidth}}></div>
         </>)
   );
+}
+
+function Leaderboard({ setDone, leaderboard }) {
+  const { socket, phase } = useContext(GameContext); 
+  const [ready, setReady] = useState(false); 
+  
+  useEffect(() => {
+    let ignore = false; 
+    if(!ignore && phase === Phases.PLAYING) {
+      setDone(false); 
+    }
+    return () => ignore = true;     
+  }, [setDone, phase]); 
+
+  const handleReady = () => {
+    socket.send(JSON.stringify({ action: Actions.READY })); 
+    setReady(true); 
+  }; 
+
+  return (
+    <BSStack className='leaderboard page' gap={4}>
+      <h1>Leaderboard</h1>
+      <BSStack className='leaderboard-list-container'>
+        <table className='leaderboard-list'>
+          <colgroup>
+            <col style={{width: '10%'}}></col>
+            <col style={{width: '30%'}}></col>
+            <col style={{width: '30%'}}></col>
+            <col style={{width: '30%'}}></col>
+          </colgroup>
+          <thead>
+            <tr style={{position: 'sticky', zIndex: 2}}>
+              <th>#</th>
+              <th>Name</th> 
+              <th>Score</th>
+              <th>Strk</th>
+            </tr>
+          </thead>
+          <tbody>
+            {leaderboard.map(({ name, score, streak }, index) => 
+              <tr key={name}>
+                <td>{index+1}</td>
+                <td>{name}</td>    
+                <td>{score}</td>
+                <td>{streak}</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </BSStack>
+      <button onClick={handleReady} disabled={!socket || ready}>Ready</button> 
+      <div className='footer'></div>
+    </BSStack>
+  ); 
 }

@@ -22,7 +22,7 @@ export default class PokePicker {
 
   pick(count) {
     const choices = [];
-    for(let i = 0; i < count && this.species.length-i-1 >= 0; ++i) {
+    for(let i = 0; i < count && this.species.length-i > 0; ++i) {
       const index = Math.floor(Math.random() * (this.species.length-i)); 
       choices.push(this.species[index]); 
       this.species[index] = this.species[this.species.length-i-1]; 
