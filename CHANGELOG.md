@@ -113,3 +113,16 @@
     * add confirmation dialogs
 
 <img alt="07_29_23" src="scrots/changelog/07_29_23.PNG" width="250">
+
+# 2023-07-30
+
+* server
+    * add streak tiers and point mulitpliers
+    * change interface to image proxy server to take direct urls
+
+* client
+    * add many more options to the host page
+    * add finishing phase
+    * fix issues with the back button
+
+<img alt="07_30_23" src="scrots/changelog/07_30_23.PNG" width="250">

@@ -3,6 +3,8 @@ import { Actions } from "./protocol.js";
 import PokePicker from "./picker.js";
 
 const BASE_POINTS_PER_ROUND = 100;
+const STREAK_TIERS = [0, 1, 2, 5, 8]; 
+const POINT_MULTIPLYERS = [0, 1, 2, 3, 5]; 
 
 class Player {
   constructor(socket, request) {
@@ -18,12 +20,12 @@ class Player {
   }
 
   update(correct) {
-    if(correct) {
-      this.score += BASE_POINTS_PER_ROUND;
-      this.streak++; 
-    } else {
-      this.streak = 0; 
+    this.streak = correct ? this.streak+1 : 0; 
+    let tier = 0; 
+    while(tier < STREAK_TIERS.length && this.streak >= STREAK_TIERS[tier+1]) {
+      tier++; 
     }
+    this.score += POINT_MULTIPLYERS[tier] * BASE_POINTS_PER_ROUND; 
   }
   
   static get_leaderboard(players) {
@@ -141,7 +143,7 @@ class Round {
                   this.players.forEach(({ socket }) => {
                     socket.send(JSON.stringify({
                       action: Actions.RESPONDED,
-                      count: results.size 
+                      name
                     })); 
                   }); 
                   if(results.size >= this.players.size) {
@@ -355,10 +357,9 @@ class Game {
     this.game_reg.games.delete(this.id); 
     await this.picker.initialize(); 
     for(let i = 0; i < this.rounds; ++i) {
-      const choices = this.picker.pick(this.count); 
+      const [choices, imgUrls]= this.picker.pick(this.count); 
       const answer = Math.floor(Math.random() * this.count) + 1; 
-      const species = choices[answer-1].toLowerCase().replace(' ', '-'); 
-      const dataUrl = await this.game_reg.ips.getDataUrl(species); 
+      const dataUrl = await this.game_reg.ips.getDataUrl(imgUrls[answer-1]); 
       const round = new Round(choices, answer, dataUrl, this.pixelation, this.players); 
       await round.ready(); 
       await round.run(this.delay, this.timeout); 

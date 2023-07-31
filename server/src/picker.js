@@ -7,6 +7,7 @@ export default class PokePicker {
   constructor(gen = 0) {
     this.gen = gen; 
     this.species = []; 
+    this.imgUrls = []; 
   }
 
   async initialize() {
@@ -15,19 +16,26 @@ export default class PokePicker {
     const genSelector = this.gen ? `#gen-${this.gen} + div` : '*'; 
     const infocards = $(genSelector).find('.infocard'); 
     this.species.length = 0; 
-    infocards.find('.ent-name').each((_, element) => {
-      this.species.push($(element).text()); 
+    infocards.find('.ent-name').each((_, elem) => {
+      this.species.push($(elem).text()); 
+    }); 
+    this.imgUrls.length = 0; 
+    infocards.find('.shinydex-sprite-shiny').each((_, elem) => {
+      this.imgUrls.push($(elem).attr('src')); 
     }); 
   }
 
   pick(count) {
-    const choices = [];
+    const choices = [], imgUrls = [];
     for(let i = 0; i < count && this.species.length-i > 0; ++i) {
       const index = Math.floor(Math.random() * (this.species.length-i)); 
       choices.push(this.species[index]); 
-      this.species[index] = this.species[this.species.length-i-1]; 
+      imgUrls.push(this.imgUrls[index]); 
+      this.species[index] = this.species.at(-i-1); 
       this.species[this.species.length-i-1] = choices[i];  
+      this.imgUrls[index] = this.imgUrls.at(-i-1); 
+      this.imgUrls[this.imgUrls.length-i-1] = imgUrls[i]; 
     }
-    return choices; 
+    return [choices, imgUrls]; 
   }
 }

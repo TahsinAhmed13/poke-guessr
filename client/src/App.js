@@ -21,13 +21,18 @@ import BSStack from 'react-bootstrap/Stack';
 import BSNav from 'react-bootstrap/Nav'; 
 import BSNavbar from 'react-bootstrap/Navbar'; 
 
+import Select from 'react-select'; 
+
 const Phases = Object.freeze({
   IDLEING: Symbol('IDLEING'),
   WAITING: Symbol('WAITING'),
   STARTING: Symbol('STARTING'),
   PLAYING: Symbol('PLAYING'), 
+  FINISHED: Symbol('FINISHED'),
 }); 
+
 const leaveMessage = 'Are you sure you want to leave this game?'; 
+const invalidMessage = 'No game in session! Returning home.'; 
 
 const GameContext = createContext();  
 
@@ -46,7 +51,6 @@ export default function App() {
   const [pixelation, setPixelation] = useState(1/256); 
   const [delay, setDelay] = useState(3); 
   const [timeout, setTimeout] = useState(-1); 
-  const [count, setCount] = useState(0); 
   const [answer, setAnswer] = useState(0); 
   const [leaderboard, setLeaderboard] = useState([]); 
   /* CONSTANTS */
@@ -105,7 +109,6 @@ export default function App() {
             pixelation={pixelation}
             delay={delay}
             timeout={timeout}
-            count={count}
             answer={answer}
             leaderboard={leaderboard}
           />
@@ -157,12 +160,8 @@ export default function App() {
             setPixelation(res.pixelation); 
             setDelay(res.delay); 
             setTimeout(res.timeout); 
-            setCount(0); 
             setAnswer(0); 
             pixelation = res.pixelation; 
-            break; 
-          case Actions.RESPONDED:
-            setCount(res.count); 
             break; 
           case Actions.ANSWER:
             setAnswer(res.answer); 
@@ -177,7 +176,7 @@ export default function App() {
             }, revealRate); 
             break; 
           case Actions.ENDED:
-            setPhase(Phases.IDLEING); 
+            setPhase(Phases.FINISHED); 
             setId(''); 
             setPlayers([]); 
             setIsHost(false); 
@@ -249,12 +248,16 @@ function Navbar() {
         </Link>
       </BSNavbar.Brand>
       <BSNav className='me-auto'>
-        <BSNav.Link href='/host'>
-          <Link to='/host' onClick={handleConfirmNavigation}>Host</Link>
-        </BSNav.Link>
-        <BSNav.Link href='/join'>
-          <Link to='/join' onClick={handleConfirmNavigation}>Join</Link>
-        </BSNav.Link>
+          <Link 
+            to='/host' 
+            className='nav-link' 
+            onClick={handleConfirmNavigation}
+          >Host</Link>
+          <Link 
+            to='/join' 
+            className='nav-link' 
+            onClick={handleConfirmNavigation}
+          >Join</Link>
       </BSNav>
     </BSNavbar>
   ); 
@@ -282,6 +285,26 @@ function Host() {
   const [waiting, setWaiting] = useState(false); 
   const hostBtnRef = useRef(); 
 
+  const pixelationOptions = [
+    { value: 0.03, label: 'Easy' },
+    { value: 0.09, label: 'Medium' },
+    { value: 0.15, label: 'Hard'},
+  ]; 
+
+  const timeoutOptions = [
+    { value: 10000, label: 'Slow' },
+    { value: 8000, label: 'Normal' },
+    { value: 5000, label: 'Fast' }, 
+    { value: 0, label: 'Unlimited' },
+  ]; 
+
+  const gens = 9; 
+  const genOptions = [
+    { value: 0, label: 'All Generations' },
+    ...Array(gens).fill(0).map((_, gen) => 
+      ({ value: gen+1, label: `Generation ${gen+1}` })), 
+  ]; 
+  
   useEffect(() => {
     let ignore = false; 
     if(!ignore)  {
@@ -301,15 +324,44 @@ function Host() {
     event.preventDefault(); 
     setWaiting(true); 
     const formData = new FormData(event.target); 
-    const { name } = Object.fromEntries(formData); 
+    const { name, gen, pixelation, timeout } = Object.fromEntries(formData); 
     socket.send(JSON.stringify({ action: Actions.HOST, name, 
-      options: {pixelation: 0.08, timeout: 10000} }));
+      options: {
+        gen: parseInt(gen),
+        pixelation: parseFloat(pixelation), 
+        timeout: parseInt(timeout)} 
+      }
+    ));
   }; 
 
   return (
     <BSForm method='POST' onSubmit={handleSubmit}>
       <BSStack className='host page' gap={4}>
         <h1>Host</h1>
+        <Select
+          className='host-select'
+          classNames={{ menu: () => 'host-option' }}
+          name='gen'
+          options={genOptions}
+          placeholder='Choose generation'
+          isSearchable={false}
+        />
+        <Select 
+          className='host-select' 
+          classNames={{ menu: () => 'host-option' }}
+          name='pixelation' 
+          options={pixelationOptions}
+          placeholder='Choose difficulty'
+          isSearchable={false}
+        />
+        <Select
+          className='host-select'
+          classNames={{ menu: () => 'host-option' }}
+          name='timeout'
+          options={timeoutOptions}
+          placeholder='Choose time limit'
+          isSearchable={false}
+        /> 
         <input 
           className='px-2'
           type='text' 
@@ -411,6 +463,7 @@ function Lobby({ id, players, isHost }) {
     if(!ignore) {
       switch(phase) {
         case Phases.IDLEING:
+          alert(invalidMessage); 
           navigate('/', { replace: true }); 
           break;
         case Phases.STARTING:
@@ -419,6 +472,10 @@ function Lobby({ id, players, isHost }) {
         case Phases.PLAYING:
           navigate('/play'); 
           break;
+        case Phases.FINISHED:
+          alert(invalidMessage); 
+          navigate('/', { replace: true }); 
+          break; 
         default:
       }
     }
@@ -451,8 +508,11 @@ function Play({ leaderboard, ...roundProps }) {
 
   useEffect(() => {
     let ignore = false; 
-    if(!ignore && phase === Phases.IDLEING) {
-      navigate('/', { replace: true }); 
+    if(!ignore) {
+      if(phase === Phases.IDLEING) {
+        alert(invalidMessage); 
+        navigate('/', { replace: true }); 
+      }
     }
     return () => ignore = true; 
   }, [phase, navigate]); 
@@ -522,7 +582,7 @@ function pixelate(dest, src, step) {
   destCtx.putImageData(pixelArray, 0, 0); 
 }
 
-function Round({ setDone, choices, dataUrl, pixelation, delay, timeout, count, answer }) {
+function Round({ setDone, choices, dataUrl, pixelation, delay, timeout, answer }) {
   const { socket } = useContext(GameContext); 
   const frameRef = useRef(null);
   const bufCanvasRef = useRef(null); 
@@ -610,7 +670,7 @@ function Round({ setDone, choices, dataUrl, pixelation, delay, timeout, count, a
               ? (<BSStack className='round-choices' gap={4}>
                   {choices.map((species, index) => 
                     <button 
-                      key={species}
+                      key={index}
                       onClick={handleRespond.bind(null, index+1)} 
                       disabled={!socket || choice || (timeout && !timer)}
                     >{species}</button>
@@ -630,20 +690,27 @@ function Round({ setDone, choices, dataUrl, pixelation, delay, timeout, count, a
 
 function Leaderboard({ setDone, leaderboard }) {
   const { socket, phase } = useContext(GameContext); 
+  const navigate = useNavigate(); 
   const [ready, setReady] = useState(false); 
   
   useEffect(() => {
     let ignore = false; 
-    if(!ignore && phase === Phases.PLAYING) {
-      setDone(false); 
+    if(!ignore) {
+      if(phase === Phases.PLAYING) {
+        setDone(false); 
+      }
     }
     return () => ignore = true;     
   }, [setDone, phase]); 
 
-  const handleReady = () => {
+  const handleNext = () => {
     socket.send(JSON.stringify({ action: Actions.READY })); 
     setReady(true); 
   }; 
+
+  const handlePlayAgain = () => {
+    navigate('/', { replace: true }); 
+  }
 
   return (
     <BSStack className='leaderboard page' gap={4}>
@@ -676,7 +743,13 @@ function Leaderboard({ setDone, leaderboard }) {
           </tbody>
         </table>
       </BSStack>
-      <button onClick={handleReady} disabled={!socket || ready}>Ready</button> 
+      <button 
+        disabled={!socket || ready}
+        onClick={phase === Phases.STARTING 
+          ? handleNext : handlePlayAgain}
+      >
+        {phase === Phases.STARTING ? 'Next' : 'Play Again'}
+      </button> 
       <div className='footer'></div>
     </BSStack>
   ); 

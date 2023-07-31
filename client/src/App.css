@@ -20,7 +20,7 @@ body {
   position: relative; 
   align-items: center;
   text-align: center;
-  font-size: 36px; 
+  font-size: 32px; 
 }
 
 .page h1, .page h2 {
@@ -54,9 +54,12 @@ body {
   transform: translateY(5px);
 }
 
-.page input[type="text"] {
-  width: 80%; 
-  max-width: 475px; 
+.page input[type="text"],
+.host-select {
+  text-align: left;
+  width: 90%; 
+  max-width: 425px; 
+  outline-color: #2684ff;
 }
 
 .home {
@@ -64,31 +67,19 @@ body {
 }
 
 .host {
-  top: 30vh; 
+  top: 18vh; 
+}
+
+.host-option {
+  font-size: 24px; 
 }
 
 .join {
-  top: 25vh; 
+  top: 28vh; 
 }
 
 .lobby {
   top: 10vh; 
-}
-
-.countdown {
-  top: 40vh; 
-}
-
-.round {
-  top: 15vh; 
-}
-
-.leaderboard {
-  top: 10vh; 
-}
-
-.footer {
-  height: 5vh; 
 }
 
 .floor {
@@ -115,24 +106,12 @@ body {
   overflow: hidden;
 }
 
-.leaderboard-list-container {
-  justify-content: start;
-  align-items: center;
-  margin: auto; 
-  width: 90%; 
-  max-width: 420px; 
-  max-height: 55vh; 
-  overflow: auto;
+.countdown {
+  top: 40vh; 
 }
 
-.leaderboard-list {
-  width: 100%; 
-  background-color: coral !important;  
-  border: 2px solid black; 
-}
-
-.leaderboard-list tr {
-  border: 1px solid black; 
+.round {
+  top: 15vh; 
 }
 
 .round button {
@@ -170,6 +149,34 @@ body {
   bottom: 0; 
   height: 20px; 
   background-color: teal;   
+}
+
+.leaderboard {
+  top: 15vh; 
+}
+
+.leaderboard-list-container {
+  justify-content: start;
+  align-items: center;
+  margin: auto; 
+  width: 90%; 
+  max-width: 420px; 
+  max-height: 55vh; 
+  overflow: auto;
+}
+
+.leaderboard-list {
+  width: 100%; 
+  background-color: coral !important;  
+  border: 2px solid black; 
+}
+
+.leaderboard-list tr {
+  border: 1px solid black; 
+}
+
+.footer {
+  height: 5vh; 
 }
 
 /* sm */
