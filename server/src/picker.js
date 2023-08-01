@@ -31,9 +31,9 @@ export default class PokePicker {
       const index = Math.floor(Math.random() * (this.species.length-i)); 
       choices.push(this.species[index]); 
       imgUrls.push(this.imgUrls[index]); 
-      this.species[index] = this.species.at(-i-1); 
+      this.species[index] = this.species[this.species.length-i-1];  
       this.species[this.species.length-i-1] = choices[i];  
-      this.imgUrls[index] = this.imgUrls.at(-i-1); 
+      this.imgUrls[index] = this.species[this.imgUrls.length-i-1]; 
       this.imgUrls[this.imgUrls.length-i-1] = imgUrls[i]; 
     }
     return [choices, imgUrls]; 
