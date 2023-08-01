@@ -1,4 +1,3 @@
-import { uptime } from 'node:process';
 import { Actions } from "./protocol.js";
 import PokePicker from "./picker.js";
 
@@ -13,10 +12,7 @@ class Player {
     this.request = request;  
     this.score = 0; 
     this.streak = 0;  
-    this.socket.on('close', () => {
-      this.closed = true; 
-      console.log(`[${Math.floor(uptime())}] Close connection from ${request.headers.host}${request.url}`); 
-    });
+    this.socket.on('close', () => this.closed = true);
   }
 
   update(correct) {
@@ -428,4 +424,3 @@ export default class GameRegistry {
     return id; 
   }
 }
-

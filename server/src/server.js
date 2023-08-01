@@ -1,6 +1,5 @@
 import 'dotenv/config.js'
 import http from 'node:http'; 
-import { uptime } from 'node:process';
 import { WebSocketServer } from 'ws';
 import { Actions } from './protocol.js';
 import ImgProxyServer from './proxy.js';
@@ -13,10 +12,6 @@ const ips = new ImgProxyServer();
 const game_reg = new GameRegistry(wss, ips); 
 
 wss.on('connection', (ws, req) => {
-  console.log(`[${Math.floor(uptime())}] New connection from ${req.headers.host}${req.url}`); 
-  ws.on('close', () => 
-    console.log(`[${Math.floor(uptime())}] Close connection from ${req.headers.host}${req.url}`)
-  ); 
   ws.on('message', (msg) => {
     try {
       const {

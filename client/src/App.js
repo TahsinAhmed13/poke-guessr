@@ -32,7 +32,7 @@ const Phases = Object.freeze({
 }); 
 
 const leaveMessage = 'Are you sure you want to leave this game?'; 
-const invalidMessage = 'No game in session! Returning home.'; 
+const invalidMessage = 'No game in session or disconnected! Returning home.'; 
 
 const GameContext = createContext();  
 
@@ -48,9 +48,9 @@ export default function App() {
   /* PLAYING PHASE */
   const [choices, setChoices] = useState([]); 
   const [dataUrl, setDataUrl] = useState(''); 
-  const [pixelation, setPixelation] = useState(1/256); 
-  const [delay, setDelay] = useState(3); 
-  const [timeout, setTimeout] = useState(-1); 
+  const [pixelation, setPixelation] = useState(0); 
+  const [delay, setDelay] = useState(0); 
+  const [timeout, setTimeout] = useState(0); 
   const [answer, setAnswer] = useState(0); 
   const [leaderboard, setLeaderboard] = useState([]); 
   /* CONSTANTS */
@@ -118,78 +118,88 @@ export default function App() {
   ]);
 
   useEffect(() => {
-    const ws = new WebSocket('ws://localhost:8000'); 
-    ws.onopen = () => {
-      let pixelation = 0; 
-      ws.addEventListener('message', ({ data }) => {
-        const res = JSON.parse(data); 
-        setErrMsg(''); 
-        switch(res.action) {
-          case Actions.HOSTED:
-            setPhase(Phases.WAITING); 
-            setId(res.id);  
-            setPlayers(res.players);  
-            setIsHost(true); 
-            break; 
-          case Actions.JOINED:
-            setPhase(Phases.WAITING); 
-            setId(res.id); 
-            setPlayers(res.players); 
-            break; 
-          case Actions.LEFT:
-            if(!res.id) {
-              setPhase(Phases.IDLEING); 
-              setIsHost(false); 
-            }
-            setId(res.id); 
-            setPlayers(res.players); 
-            break; 
-          case Actions.STARTED:
-            setPhase(Phases.STARTING); 
-            break; 
-          case Actions.CANCELLED:
-            setPhase(Phases.IDLEING); 
-            setId(''); 
-            setPlayers([]); 
-            setIsHost(false); 
-            break; 
-          case Actions.QUESTION:
-            setPhase(Phases.PLAYING); 
-            setChoices(res.choices); 
-            setDataUrl(res.dataUrl); 
-            setPixelation(res.pixelation); 
-            setDelay(res.delay); 
-            setTimeout(res.timeout); 
-            setAnswer(0); 
-            pixelation = res.pixelation; 
-            break; 
-          case Actions.ANSWER:
-            setAnswer(res.answer); 
-            setLeaderboard(res.leaderboard); 
-            const delta = pixelation / (revealTime / revealRate); 
-            const intervalId = setInterval(() => {
-              pixelation = Math.max(0, pixelation-delta); 
-              setPixelation(pixelation); 
-              if(!pixelation) {
-                clearInterval(intervalId); 
+    let ws = null; 
+    const connect = () => { 
+      ws = new WebSocket('ws://localhost:8000'); 
+      ws.addEventListener('open', () => {
+        let pixelation = 0; 
+        ws.addEventListener('message', ({ data }) => {
+          const res = JSON.parse(data); 
+          setErrMsg(''); 
+          switch(res.action) {
+            case Actions.HOSTED:
+              setPhase(Phases.WAITING); 
+              setId(res.id);  
+              setPlayers(res.players);  
+              setIsHost(true); 
+              break; 
+            case Actions.JOINED:
+              setPhase(Phases.WAITING); 
+              setId(res.id); 
+              setPlayers(res.players); 
+              break; 
+            case Actions.LEFT:
+              if(!res.id) {
+                setPhase(Phases.IDLEING); 
+                setIsHost(false); 
               }
-            }, revealRate); 
-            break; 
-          case Actions.ENDED:
-            setPhase(Phases.FINISHED); 
-            setId(''); 
-            setPlayers([]); 
-            setIsHost(false); 
-            break; 
-          case Actions.ERROR:
-            setErrMsg(res.message); 
-            break; 
-          default: 
-        }
+              setId(res.id); 
+              setPlayers(res.players); 
+              break; 
+            case Actions.STARTED:
+              setPhase(Phases.STARTING); 
+              break; 
+            case Actions.CANCELLED:
+              setPhase(Phases.IDLEING); 
+              setId(''); 
+              setPlayers([]); 
+              setIsHost(false); 
+              break; 
+            case Actions.QUESTION:
+              setPhase(Phases.PLAYING); 
+              setChoices(res.choices); 
+              setDataUrl(res.dataUrl); 
+              setPixelation(res.pixelation); 
+              setDelay(res.delay); 
+              setTimeout(res.timeout); 
+              setAnswer(0); 
+              pixelation = res.pixelation; 
+              break; 
+            case Actions.ANSWER:
+              setAnswer(res.answer); 
+              setLeaderboard(res.leaderboard); 
+              const delta = pixelation / (revealTime / revealRate); 
+              const intervalId = setInterval(() => {
+                pixelation = Math.max(0, pixelation-delta); 
+                setPixelation(pixelation); 
+                if(!pixelation) {
+                  clearInterval(intervalId); 
+                }
+              }, revealRate); 
+              break; 
+            case Actions.ENDED:
+              setPhase(Phases.FINISHED); 
+              setId(''); 
+              setPlayers([]); 
+              setIsHost(false); 
+              break; 
+            case Actions.ERROR:
+              setErrMsg(res.message); 
+              break; 
+            default: 
+          }
+        }); 
+        ws.addEventListener('close', connect); 
+        setSocket(ws); 
       }); 
+      setSocket(null); 
+      setPhase(Phases.IDLEING); 
     }; 
-    setSocket(ws); 
-    return () => ws.close();
+    connect(); 
+    return () => {
+      ws?.removeEventListener('close', connect); 
+      ws?.close(); 
+    }; 
   }, []); 
   
   useEffect(() => {
@@ -230,7 +240,7 @@ function Navbar() {
   const { socket, phase } = useContext(GameContext); 
   
   const handleConfirmNavigation = (event) => {
-    if(phase !== Phases.IDLEING) {
+    if(phase !== Phases.IDLEING && phase !== Phases.FINISHED) {
       const confirmation = window.confirm(leaveMessage); 
       if(confirmation) {
         socket.send(JSON.stringify({ action: Actions.LEAVE })); 
@@ -243,7 +253,7 @@ function Navbar() {
   return (
     <BSNavbar fixed='top' className='navbar shadow'>
       <BSNavbar.Brand className='ms-3'>
-        <Link to='/' onClick={handleConfirmNavigation}>
+        <Link to='/' onClick={handleConfirmNavigation} replace>
           <img src={logo} alt='Shiny Charm' width='30'/>
         </Link>
       </BSNavbar.Brand>
@@ -252,12 +262,12 @@ function Navbar() {
             to='/host' 
             className='nav-link' 
             onClick={handleConfirmNavigation}
-          >Host</Link>
+            replace>Host</Link>
           <Link 
             to='/join' 
             className='nav-link' 
             onClick={handleConfirmNavigation}
-          >Join</Link>
+            replace>Join</Link>
       </BSNav>
     </BSNavbar>
   ); 
@@ -272,8 +282,12 @@ function Home() {
         <h1>PokéGuessr</h1>
         <h2>Shiny Edition</h2>
       </BSStack>
-      <button onClick={() => navigate('/host')}>Host</button>
-      <button onClick={() => navigate('/join')}>Join</button>
+      <button onClick={() => navigate('/host', { replace: true })}>Host</button>
+      <button onClick={() => navigate('/join', { replace: true })}>Join</button>
+      <iframe src={"https://ghbtns.com/github-btn.html?" +
+        "user=TahsinAhmed13&repo=poke-guessr&type=star&count=false&size=large"} 
+        frameborder="0" scrolling="0" width="75" height="30" title="GitHub">
+      </iframe>
       <div className='footer'></div>
     </BSStack>
   ); 
@@ -310,7 +324,7 @@ function Host() {
     if(!ignore)  {
       if(phase === Phases.WAITING) {
         setWaiting(false); 
-        navigate('/lobby'); 
+        navigate('/lobby', { replace: true }); 
       } else if(errMsg) {
         setWaiting(false);  
         hostBtnRef.current.setCustomValidity(errMsg); 
@@ -393,7 +407,7 @@ function Join() {
     if(!ignore) {
       if(phase === Phases.WAITING) {
         setWaiting(false); 
-        navigate('/lobby'); 
+        navigate('/lobby', { replace: true }); 
       } else if(errMsg) {
         setWaiting(false); 
         joinBtnRef.current.setCustomValidity(errMsg); 
@@ -470,12 +484,8 @@ function Lobby({ id, players, isHost }) {
           socket.send(JSON.stringify({ action: Actions.READY })); 
           break; 
         case Phases.PLAYING:
-          navigate('/play'); 
+          navigate('/play', { replace: true }); 
           break;
-        case Phases.FINISHED:
-          alert(invalidMessage); 
-          navigate('/', { replace: true }); 
-          break; 
         default:
       }
     }

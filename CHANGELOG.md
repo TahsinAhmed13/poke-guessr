@@ -126,3 +126,9 @@
     * fix issues with the back button
 
 <img alt="07_30_23" src="scrots/changelog/07_30_23.PNG" width="250">
+
+# 2023-07-31
+
+* client
+    * add github button to homepage
+    * add reconnect mechanism

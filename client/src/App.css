@@ -13,7 +13,7 @@ body {
 }
 
 .navbar a:hover {
-  color: #f0f0f0; 
+  color: white; 
 }
 
 .page {
@@ -59,7 +59,7 @@ body {
   text-align: left;
   width: 90%; 
   max-width: 425px; 
-  outline-color: #2684ff;
+  outline-color: var(--bs-primary);
 }
 
 .home {
@@ -180,7 +180,7 @@ body {
 }
 
 /* sm */
-@media (min-width: 576px) {
+@media (min-width: var(--breakpoint-sm)) {
   .floor {
     width: 75%; 
   }
@@ -191,7 +191,7 @@ body {
 }
 
 /* md */
-@media (min-width: 768px) {
+@media (min-width: var(--breakpoint-md)) {
   .floor {
     width: 70%; 
   }
@@ -207,7 +207,7 @@ body {
 }
 
 /* lg */
-@media (min-width: 992px) {
+@media (min-width: var(--breakpoint-lg)) {
   .floor {
     width: 65%; 
   }
@@ -218,7 +218,7 @@ body {
 }
 
 /* xl */
-@media (min-width: 1200px) {
+@media (min-width: var(--breakpoint-xl)) {
   .floor {
     width: 60%; 
   }
