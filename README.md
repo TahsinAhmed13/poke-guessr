@@ -14,7 +14,7 @@ Try to guess Pokémon based on their shiny forms. Play multiplayer against frien
 
 Easily host and join games for friends by sharing unique ids. 
 
-<div style="display: flex; justify-content: space-evenly; flex-wrap: wrap">
+<div align="center" style="display: flex; justify-content: space-evenly; flex-wrap: wrap">
     <img alt="host" src="scrots/readme/host.PNG" width="45%"/>
     <img alt="join" src="scrots/readme/join.PNG" width="45%"/>
 </div>
