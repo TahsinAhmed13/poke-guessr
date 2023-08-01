@@ -1,5 +1,4 @@
-import 'dotenv/config.js'
-import http from 'node:http'; 
+import 'dotenv/config'; 
 import { WebSocketServer } from 'ws';
 import { Actions } from './protocol.js';
 import ImgProxyServer from './proxy.js';

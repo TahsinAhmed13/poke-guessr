@@ -23,6 +23,8 @@ import BSNavbar from 'react-bootstrap/Navbar';
 
 import Select from 'react-select'; 
 
+const WSS = process.env.REACT_APP_WSS || 'ws://localhost:8000'; 
+
 const Phases = Object.freeze({
   IDLEING: Symbol('IDLEING'),
   WAITING: Symbol('WAITING'),
@@ -120,7 +122,7 @@ export default function App() {
   useEffect(() => {
     let ws = null; 
     const connect = () => { 
-      ws = new WebSocket('ws://localhost:8000'); 
+      ws = new WebSocket(WSS); 
       ws.addEventListener('open', () => {
         let pixelation = 0; 
         ws.addEventListener('message', ({ data }) => {
@@ -286,7 +288,7 @@ function Home() {
       <button onClick={() => navigate('/join', { replace: true })}>Join</button>
       <iframe src={"https://ghbtns.com/github-btn.html?" +
         "user=TahsinAhmed13&repo=poke-guessr&type=star&count=false&size=large"} 
-        frameborder="0" scrolling="0" width="75" height="30" title="GitHub">
+        width="75" height="30" title="GitHub">
       </iframe>
       <div className='footer'></div>
     </BSStack>
