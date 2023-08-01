@@ -186,7 +186,7 @@ body {
 }
 
 /* sm */
-@media (min-width: var(--breakpoint-sm)) {
+@media (min-width: 576px) {
   .floor {
     width: 75%; 
   }
@@ -197,7 +197,7 @@ body {
 }
 
 /* md */
-@media (min-width: var(--breakpoint-md)) {
+@media (min-width: 768px) {
   .floor {
     width: 70%; 
   }
@@ -213,7 +213,7 @@ body {
 }
 
 /* lg */
-@media (min-width: var(--breakpoint-lg)) {
+@media (min-width: 992px) {
   .floor {
     width: 65%; 
   }
@@ -224,7 +224,7 @@ body {
 }
 
 /* xl */
-@media (min-width: var(--breakpoint-xl)) {
+@media (min-width: 1200px) {
   .floor {
     width: 60%; 
   }
