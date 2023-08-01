@@ -5,9 +5,8 @@ import { Actions } from './protocol.js';
 import ImgProxyServer from './proxy.js';
 import GameRegistry from './game.js';
 
-const port = process.env.SERVER_PORT || 8000; 
-const server = http.createServer(); 
-const wss = new WebSocketServer({ server }); 
+const PORT = process.env.PORT || 8000; 
+const wss = new WebSocketServer({ port: PORT }); 
 const ips = new ImgProxyServer(); 
 const game_reg = new GameRegistry(wss, ips); 
 
@@ -58,8 +57,4 @@ wss.on('connection', (ws, req) => {
       }));
     }
   }); 
-}); 
-
-server.listen(port, () => {
-  console.log(`Server started on port ${port}`); 
 }); 
