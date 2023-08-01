@@ -87,8 +87,6 @@ body {
   width: 80%; 
   height: 45vh; 
   background-color: #FAA0A0;
-  overflow-x: hidden; 
-  overflow-y: auto; 
 }
 
 .floor-list {
@@ -177,6 +175,14 @@ body {
 
 .footer {
   height: 5vh; 
+}
+
+.error {
+  top: 40vh; 
+}
+
+.error p {
+  font-size: 20px; 
 }
 
 /* sm */

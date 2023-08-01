@@ -10,6 +10,7 @@ import {
   Link,
   RouterProvider,
   useNavigate,
+  useRouteError,
 } from 'react-router-dom'; 
 import logo from './assets/logo.png'; 
 import frame from './assets/frame.png'; 
@@ -66,6 +67,12 @@ export default function App() {
         <>
           <Navbar/>
           <Home/>
+        </>
+      ),
+      errorElement: (
+        <>
+          <Navbar/>
+          <ErrorPage/>
         </>
       ),
     },
@@ -763,6 +770,18 @@ function Leaderboard({ setDone, leaderboard }) {
         {phase === Phases.STARTING ? 'Next' : 'Play Again'}
       </button> 
       <div className='footer'></div>
+    </BSStack>
+  ); 
+}
+
+function ErrorPage() {
+  const error = useRouteError();   
+
+  return (
+    <BSStack className='error page'>
+      <h1>Oops!</h1>
+      <p>Sorry, an unexpected error has occured</p>
+      <p><i>{error.statusText || error.message}</i></p>
     </BSStack>
   ); 
 }

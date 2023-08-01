@@ -132,3 +132,8 @@
 * client
     * add github button to homepage
     * add reconnect mechanism
+
+# 2023-08-01
+
+* client
+    * add simple error page
